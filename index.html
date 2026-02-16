@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Professional motor starting simulator with DOL and Soft Start analysis">
+    <meta name="theme-color" content="#22d3ee">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Motor Starter">
+    <title>Motor Starter Simulator | Professional Edition</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%2322d3ee' width='512' height='512'/%3E%3Cpath fill='%23000' d='M128 256l128-128v96h128v64H256v96z'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div>
+                <h1>Motor Starter Simulator</h1>
+                <div class="signature">By: Ayman Elkhodary</div>
+            </div>
+            <div class="header-right">
+                <a href="#notes" class="btn-notes">📚 See Notes</a>
+                <button id="btnExportPDF" class="btn-pdf">💾 Save to PDF</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="dashboard">
+        <aside class="sidebar">
+            <section class="card case-manager">
+                <h3>💼 Case Management</h3>
+                <div class="f-group">
+                    <label>Case Name</label>
+                    <input type="text" id="caseName" placeholder="e.g., 450kW Pump">
+                </div>
+                <div class="grid-2 mt-10">
+                    <button id="btnSaveCase" class="btn-main save-btn">Save Case</button>
+                    <button class="btn-text" id="btnClearCases">Clear All</button>
+                </div>
+                <div class="f-group mt-10">
+                    <label>Load Saved Case</label>
+                    <select id="caseDropdown" class="input-select"></select>
+                </div>
+            </section>
+
+            <section class="card">
+                <h3>⚙️ Motor Configuration</h3>
+                <div class="grid-2">
+                    <div class="f-group"><label>Power (kW)</label><input type="number" id="mKW" value="450"></div>
+                    <div class="f-group"><label>FLC (A)</label><input type="number" id="mFLC" value="48"></div>
+                    <div class="f-group"><label>Rated RPM</label><input type="number" id="mRPM" value="1485"></div>
+                    <div class="f-group"><label>Poles</label><input type="number" id="mPoles" value="4"></div>
+                    <div class="f-group"><label>Frequency (Hz)</label><input type="number" id="mFreq" value="50"></div>
+                    <div class="f-group"><label>Hot Stall (s)</label><input type="number" id="hStall" value="15"></div>
+                </div>
+                
+                <div class="inertia-section mt-15">
+                    <label class="section-label">Moment of Inertia (kgm²)</label>
+                    <div class="grid-2 mt-5">
+                        <div class="f-group"><label>Motor J</label><input type="number" id="motorJ" value="1.96"></div>
+                        <div class="f-group"><label>Load J</label><input type="number" id="loadJ" value="13.74"></div>
+                    </div>
+                    <div class="combined-value">Combined: <span id="totalJ">15.70</span> kgm²</div>
+                </div>
+
+                <div class="readout-grid">
+                    <div class="readout-item">
+                        <span class="readout-label">Rated Torque</span>
+                        <span class="readout-value"><span id="resFLT">2893</span> <span class="readout-unit">Nm</span></span>
+                    </div>
+                    <div class="readout-item">
+                        <span class="readout-label">Sync Speed</span>
+                        <span class="readout-value"><span id="resSyncSpeed">1500</span> <span class="readout-unit">RPM</span></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h3>🎚️ Starting Method</h3>
+                <div class="mode-selector">
+                    <button id="modeDOL" class="mode-btn active">⚡ DOL Start</button>
+                    <button id="modeSS" class="mode-btn">🎚️ Soft Start</button>
+                </div>
+
+                <div id="ssControls" style="display: none;" class="mt-15">
+                    <h4>Soft Start Parameters</h4>
+                    <div class="grid-3">
+                        <div class="f-group">
+                            <label>Initial %</label>
+                            <input type="number" id="ssInitialI" value="250">
+                        </div>
+                        <div class="f-group">
+                            <label>Final %</label>
+                            <input type="number" id="ssFinalI" value="300">
+                        </div>
+                        <div class="f-group">
+                            <label>Ramp (s)</label>
+                            <input type="number" id="ssRampTime" value="1" step="0.1">
+                        </div>
+                    </div>
+                    <div class="info-banner">
+                        💡 Click Start Time result and edit to find required current for target time
+                    </div>
+                </div>
+
+                <button id="btnSimulate" class="btn-main btn-simulate">▶️ RUN SIMULATION</button>
+            </section>
+
+            <section class="card scroll-card">
+                <h3>📋 Performance Data</h3>
+                <div class="grid-2 mb-10">
+                    <div class="f-group">
+                        <label>Motor Preset</label>
+                        <select id="motorPreset" class="input-select">
+                            <option value="current">-- Current Values --</option>
+                            <option value="oem">OEM 450kW Pump</option>
+                            <option value="designC">Design C (High Torque)</option>
+                            <option value="highSlip">High Slip Design</option>
+                        </select>
+                    </div>
+                    <div class="f-group">
+                        <label>Load Preset</label>
+                        <select id="loadPreset" class="input-select">
+                            <option value="current">-- Current Values --</option>
+                            <option value="oem">OEM Centrifugal</option>
+                            <option value="centrifugal">Centrifugal Pump</option>
+                            <option value="constant">Constant Torque</option>
+                        </select>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Speed</th>
+                            <th>Motor T%</th>
+                            <th>Motor I%</th>
+                            <th>Load T%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </section>
+        </aside>
+
+        <article class="results">
+            <section class="card">
+                <h3>📈 Results</h3>
+                <div class="interpolation-toggle">
+                    <span>Method: <span id="interpolationMethod">Cubic Spline</span></span>
+                    <button id="splineToggle" class="btn-toggle">Cubic ✓</button>
+                </div>
+                <div class="results-grid">
+                    <div class="result-item">
+                        <span class="result-label">Start Time</span>
+                        <span class="result-value" id="resultTime">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Thermal <button id="thermalToggle" class="btn-thermal">→ I²t</button></span>
+                        <span class="result-value" id="resultTherm">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Min Net Torque</span>
+                        <span class="result-value" id="resultNet">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Min Starting I</span>
+                        <span class="result-value" id="resultMinI">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Final Slip</span>
+                        <span class="result-value" id="resultFinalSlip">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Operating Speed</span>
+                        <span class="result-value" id="resultOpSpeed">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h3>📊 Torque-Current-Speed Characteristics</h3>
+                <div class="chart-container">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </section>
+        </article>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
