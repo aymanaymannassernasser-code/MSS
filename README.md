@@ -36,35 +36,51 @@ At 0% speed (locked rotor):
 - Net Torque: 1967 Nm
 - Acceleration: 1967 / 15.7 = 125.3 rad/s²
 
+Soft Start at 300% current limit:
+- Full voltage current: 590%
+- Voltage ratio: 300/590 = 0.508
+- Motor torque reduced: 80% × 0.508² = 20.6%
+- Motor torque: 20.6% × 2893 = 596 Nm
+- Net torque: 596 - 347 = 249 Nm (positive - will start)
+- Acceleration: 249 / 15.7 = 15.9 rad/s² (much slower than DOL)
+
 At rated speed (1485 RPM = 155.5 rad/s):
-- Time to accelerate ≈ 155.5 / avg_accel ≈ 1-1.5 seconds
+- DOL time ≈ 155.5 / avg_accel ≈ 1-1.5 seconds
+- Soft Start time ≈ 10-12 seconds (lower acceleration)
 ```
 
 ---
 
 ### 2. **Voltage-Torque Relationship (Soft Start)**
 
-For induction motors, torque is proportional to voltage squared:
+For induction motors with soft starters, the voltage reduction is proportional to current:
 
 ```
-V_reduced / V_rated = √(I_limit / I_full)    [Voltage ratio]
+V_reduced / V_rated = I_limit / I_full    [Voltage proportional to current]
 
-T_reduced = T_rated × (V_reduced / V_rated)²  [Torque reduction]
+T_reduced = T_rated × (V_reduced / V_rated)²  [Torque proportional to voltage squared]
 
-Therefore: T ∝ V² ∝ I
+Therefore: T ∝ V² and since V ∝ I, we get: T ∝ I²
 ```
 
 **Physical Basis:**
-- Voltage reduction reduces flux: Φ ∝ V
+- Soft starter reduces voltage linearly with current
+- Reduced voltage → reduced magnetic flux: Φ ∝ V
 - Torque depends on flux squared: T ∝ Φ²
-- Therefore: T ∝ V²
+- Therefore: T ∝ V² ∝ I²
 
 **Example:**
 ```
-If current limited to 300% (vs 590% full voltage):
-- Voltage ratio: √(300/590) = 0.713
-- Torque: 80% × 0.713² = 40.6%
+If current limited to 300% (vs 590% at full voltage):
+- Voltage ratio: 300/590 = 0.508 (linear)
+- Torque: 80% × 0.508² = 20.6%
 ```
+
+**IMPORTANT:** This assumes resistive voltage control typical in soft starters. 
+For thyristor-based soft starters, the relationship is:
+- V_rms ∝ firing angle (phase control)
+- Current follows voltage reduction
+- Net effect: T ∝ V² ∝ I²
 
 ---
 

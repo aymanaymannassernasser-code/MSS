@@ -1,6 +1,6 @@
 // Motor Starter Simulator - Professional Edition
 // By: Ayman Elkhodary
-// Physics: Angular dynamics with proper torque-speed integration
+// Physics: J × dω/dt = T_net, V ∝ I (linear), T ∝ V² ∝ I²
 
 const S_POINTS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100];
 
@@ -44,7 +44,7 @@ function interpolateLinear(x, xArr, yArr) {
     return parseFloat(yArr[yArr.length - 1]);
 }
 
-// CUBIC SPLINE with monotonic constraints
+// CUBIC SPLINE (Monotonic - Fritsch-Carlson)
 function createMonotonicSpline(xArr, yArr) {
     const n = xArr.length - 1;
     const h = [], delta = [], m = new Array(n + 1);
@@ -76,7 +76,6 @@ function createMonotonicSpline(xArr, yArr) {
 function evaluateMonotonicSpline(spline, x) {
     x = parseFloat(x);
     const n = spline.x.length - 1;
-    
     if (x <= spline.x[0]) return parseFloat(spline.y[0]);
     if (x >= spline.x[n]) return parseFloat(spline.y[n]);
     
@@ -241,6 +240,7 @@ function calculateMinStartingCurrent(tableMt, tableMc, tableLt) {
     return { current: 700, criticalSpeed: 0 };
 }
 
+// CRITICAL FIX: Comprehensive stall detection
 function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = false) {
     const mRPM = parseFloat(document.getElementById('mRPM').value);
     const mFLC = parseFloat(document.getElementById('mFLC').value);
@@ -250,7 +250,7 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
     
     if (totalJ <= 0) {
         alert('ERROR: Total inertia must be > 0');
-        return { time: 60, isStalled: true, stallReason: "Invalid" };
+        return { time: 60, isStalled: true, stallReason: "Invalid Inertia" };
     }
     
     const fltNm = parseFloat(document.getElementById('resFLT').innerText);
@@ -278,6 +278,10 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
     let isStalled = false, stallSpd = null, stallReason = "";
     let speedRadS = 0, rampEndSpeed = 0;
     const dt = 0.01;
+    
+    // For hung detection
+    let lastSpeedCheck = 0;
+    let lastSpeedValue = 0;
 
     while (time < 60 && speedPerc < 99) {
         let motorTorquePct = interpolate(speedPerc, S_POINTS, tableMt);
@@ -297,6 +301,7 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
             } else {
                 currentLimit = ssFinalI;
             }
+            // CORRECT: V ∝ I (linear), then T ∝ V² ∝ I²
             let voltageRatio = Math.min(1.0, currentLimit / motorCurrentPct);
             actualMotorTorquePct = motorTorquePct * voltageRatio * voltageRatio;
             actualMotorCurrentPct = motorCurrentPct * voltageRatio;
@@ -309,21 +314,67 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
             criticalNetSpeed = speedPerc;
         }
         
-        if (speedPerc < 90 && netTorquePct < -0.5) {
-            isStalled = true;
-            stallReason = "Mechanical";
-            stallSpd = speedPerc;
-            break;
+        // COMPREHENSIVE STALL DETECTION
+        if (!isStalled && speedPerc < 98) {
+            // 1. NEGATIVE NET TORQUE (motor can't overcome load)
+            if (netTorquePct < 0) {
+                isStalled = true;
+                stallReason = "Insufficient Torque (Negative)";
+                stallSpd = speedPerc;
+                break;
+            }
+            
+            // 2. CRITICALLY LOW NET TORQUE (< 0.5%, essentially stuck)
+            if (netTorquePct < 0.5 && speedPerc < 80) {
+                isStalled = true;
+                stallReason = "Insufficient Torque (<0.5%)";
+                stallSpd = speedPerc;
+                break;
+            }
+            
+            // 3. THERMAL OVERLOAD
+            if (thermal >= 100) {
+                isStalled = true;
+                stallReason = "Thermal Overload";
+                stallSpd = speedPerc;
+                break;
+            }
+            
+            // 4. HUNG (speed not progressing - check every 1.5 seconds)
+            if (time - lastSpeedCheck >= 1.5) {
+                if (Math.abs(speedPerc - lastSpeedValue) < 0.3 && time > 2.0) {
+                    isStalled = true;
+                    stallReason = "Hung (No Acceleration)";
+                    stallSpd = speedPerc;
+                    break;
+                }
+                lastSpeedCheck = time;
+                lastSpeedValue = speedPerc;
+            }
+            
+            // 5. EXCESSIVE TIME (taking too long, likely stuck)
+            if (time > 45 && speedPerc < 80) {
+                isStalled = true;
+                stallReason = "Timeout (Excessive Start Time)";
+                stallSpd = speedPerc;
+                break;
+            }
         }
         
-        let netTorqueNm = (netTorquePct / 100.0) * fltNm;
-        let angularAccel = netTorqueNm / totalJ;
-        speedRadS += angularAccel * dt;
-        speedPerc = (speedRadS / targetRadS) * 100.0;
+        if (isStalled) break;
         
-        let actualCurrentAmps = (actualMotorCurrentPct / 100.0) * mFLC;
-        thermalAbsRaw += actualCurrentAmps * actualCurrentAmps * dt;
-        thermal = (thermalAbsRaw / (lockedRotorCurrentAmps * lockedRotorCurrentAmps * hStall)) * 100.0;
+        if (speedPerc < 98.5) {
+            // Physics: J × dω/dt = T_net
+            let netTorqueNm = (netTorquePct / 100.0) * fltNm;
+            let angularAccel = netTorqueNm / totalJ;
+            speedRadS += angularAccel * dt;
+            speedPerc = (speedRadS / targetRadS) * 100.0;
+            
+            // Thermal accumulation: I²t
+            let actualCurrentAmps = (actualMotorCurrentPct / 100.0) * mFLC;
+            thermalAbsRaw += actualCurrentAmps * actualCurrentAmps * dt;
+            thermal = (thermalAbsRaw / (lockedRotorCurrentAmps * lockedRotorCurrentAmps * hStall)) * 100.0;
+        }
         
         time += dt;
     }
@@ -355,6 +406,12 @@ function runSimulation() {
     let minStartResult = { current: 0, criticalSpeed: 0 };
     if (simulationMode === 'SS') {
         minStartResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
+        const userCurrent = Math.max(ssInitialI, ssFinalI);
+        
+        // Warn if below minimum, but let simulation run to show stall
+        if (userCurrent < minStartResult.current) {
+            alert(`⚠️ WARNING: Current below minimum!\n\nYour: ${userCurrent}%\nMinimum: ${minStartResult.current}%\n\nMotor will likely STALL at ~${minStartResult.criticalSpeed}% speed.`);
+        }
     }
 
     let results = runSimulationCore(simulationMode, ssInitialI, ssFinalI, ssRampTime, true);
@@ -400,17 +457,20 @@ function displayResults(results) {
     if (results.isStalled) {
         timeField.innerText = `STALL (${results.stallReason})`;
         timeField.contentEditable = 'false';
+        timeField.style.background = 'rgba(244, 63, 94, 0.2)';
+        timeField.style.color = '#f43f5e';
     } else {
         timeField.innerText = results.time.toFixed(2) + "s";
         timeField.contentEditable = simulationMode === 'SS' ? 'true' : 'false';
         timeField.style.cursor = simulationMode === 'SS' ? 'text' : 'default';
+        timeField.style.background = '';
+        timeField.style.color = '';
     }
     
     document.getElementById('resultTherm').innerText = thermalMode === 'absolute' ? 
         results.thermalAbs.toFixed(0) + " A²·s" : results.thermal.toFixed(1) + "%";
     
     const minNetAbs = (results.minNet * results.fltNm / 100).toFixed(1);
-    const criticalSlip = (1 - (results.criticalNetSpeed / 100)).toFixed(3);
     document.getElementById('resultNet').innerText = 
         `${results.minNet.toFixed(1)}% (${minNetAbs} Nm) @ ${results.criticalNetSpeed.toFixed(0)}%spd`;
     
@@ -424,7 +484,7 @@ function displayResults(results) {
     
     document.getElementById('resultFinalSlip').innerText = results.finalSlip.toFixed(3);
     
-    // Calculate Operating Speed: ω_operating = ω_sync × (1 - slip)
+    // Calculate Operating Speed: ω_op = ω_rated × (1 - slip)
     const operatingRPM = mRPM * (1 - results.finalSlip);
     document.getElementById('resultOpSpeed').innerText = operatingRPM.toFixed(0) + " RPM";
 }
