@@ -148,15 +148,15 @@ header{background:#000;border-bottom:2px solid var(--acc);display:flex;
       <div class="fg"><label>X Min</label><input type="number" id="xMin" value="0" oninput="redraw()"></div>
       <div class="fg"><label>X Max</label><input type="number" id="xMax" value="100" oninput="redraw()"></div>
     </div>
-    <div class="axlabel" style="color:var(--acc);">Left Y — Torque (%)</div>
+    <div class="axlabel" id="leftYLabel" style="color:var(--yel);">Left Y — Current (%)</div>
     <div class="ig">
-      <div class="fg"><label>Torque Min</label><input type="number" id="lyMin" value="0" oninput="redraw()"></div>
-      <div class="fg"><label>Torque Max</label><input type="number" id="lyMax" value="200" oninput="redraw()"></div>
+      <div class="fg"><label id="lyMinLabel">Current Min</label><input type="number" id="lyMin" value="0" oninput="redraw()"></div>
+      <div class="fg"><label id="lyMaxLabel">Current Max</label><input type="number" id="lyMax" value="700" oninput="redraw()"></div>
     </div>
-    <div class="axlabel" style="color:var(--yel);">Right Y — Current (%)</div>
+    <div class="axlabel" id="rightYLabel" style="color:var(--acc);">Right Y — Torque (%)</div>
     <div class="ig">
-      <div class="fg"><label>Current Min</label><input type="number" id="ryMin" value="0" oninput="redraw()"></div>
-      <div class="fg"><label>Current Max</label><input type="number" id="ryMax" value="700" oninput="redraw()"></div>
+      <div class="fg"><label id="ryMinLabel">Torque Min</label><input type="number" id="ryMin" value="0" oninput="redraw()"></div>
+      <div class="fg"><label id="ryMaxLabel">Torque Max</label><input type="number" id="ryMax" value="200" oninput="redraw()"></div>
     </div>
     <div class="info ok" style="margin:10px 0 10px;">
       ✋ <strong>Drag box corners/edges</strong> to align with chart axes. Grid labels update live.
@@ -383,8 +383,53 @@ function swapAllAxes(){
     axisMap[c] = axisMap[c]==='left'?'right':'left';
   });
   updateAxisBadges();
+  
+  // Swap the INPUT FIELD VALUES between left and right Y
+  const lyMinVal = document.getElementById('lyMin').value;
+  const lyMaxVal = document.getElementById('lyMax').value;
+  const ryMinVal = document.getElementById('ryMin').value;
+  const ryMaxVal = document.getElementById('ryMax').value;
+  
+  document.getElementById('lyMin').value = ryMinVal;
+  document.getElementById('lyMax').value = ryMaxVal;
+  document.getElementById('ryMin').value = lyMinVal;
+  document.getElementById('ryMax').value = ryMaxVal;
+  
+  // Swap the LABELS
+  const leftLabel = document.getElementById('leftYLabel');
+  const rightLabel = document.getElementById('rightYLabel');
+  const lyMinLabel = document.getElementById('lyMinLabel');
+  const lyMaxLabel = document.getElementById('lyMaxLabel');
+  const ryMinLabel = document.getElementById('ryMinLabel');
+  const ryMaxLabel = document.getElementById('ryMaxLabel');
+  
+  // Determine current state by checking if left is currently Current or Torque
+  const leftIsCurrent = leftLabel.textContent.includes('Current');
+  
+  if(leftIsCurrent){
+    // Swap to: Left=Torque, Right=Current
+    leftLabel.innerHTML = 'Left Y — Torque (%)';
+    leftLabel.style.color = 'var(--acc)'; // cyan for torque
+    rightLabel.innerHTML = 'Right Y — Current (%)';
+    rightLabel.style.color = 'var(--yel)'; // yellow for current
+    lyMinLabel.textContent = 'Torque Min';
+    lyMaxLabel.textContent = 'Torque Max';
+    ryMinLabel.textContent = 'Current Min';
+    ryMaxLabel.textContent = 'Current Max';
+  } else {
+    // Swap to: Left=Current, Right=Torque
+    leftLabel.innerHTML = 'Left Y — Current (%)';
+    leftLabel.style.color = 'var(--yel)';
+    rightLabel.innerHTML = 'Right Y — Torque (%)';
+    rightLabel.style.color = 'var(--acc)';
+    lyMinLabel.textContent = 'Current Min';
+    lyMaxLabel.textContent = 'Current Max';
+    ryMinLabel.textContent = 'Torque Min';
+    ryMaxLabel.textContent = 'Torque Max';
+  }
+  
   redraw();
-  showToast('⇄ Swapped all axes: Torque ↔ Current');
+  showToast('⇄ Swapped all axes: Input fields updated!');
 }
 function updateAxisBadges(){
   CURVES.forEach(c=>{
@@ -615,25 +660,30 @@ function drawBox(bp){
   }
   ctx.setLineDash([]);
 
-  // Axis tick labels
+  // Axis tick labels - colors match DATA type, not position
   ctx.font='bold 10px JetBrains Mono,monospace';
+  // Determine if left Y is Current or Torque by checking section header
+  const leftIsCurrent = document.getElementById('leftYLabel').textContent.includes('Current');
+  const leftColor = leftIsCurrent ? 'rgba(251,191,36,0.85)' : 'rgba(34,211,238,0.85)';
+  const rightColor = leftIsCurrent ? 'rgba(34,211,238,0.85)' : 'rgba(251,191,36,0.85)';
+  
   // X ticks
   for(let xi=0;xi<=5;xi++){
     const px=bp.l+xi/5*(bp.r-bp.l);
     const v=(ax.xMin+xi/5*(ax.xMax-ax.xMin)).toFixed(0)+'%';
     ctx.fillStyle='rgba(34,211,238,0.85)';ctx.fillText(v,px-8,bp.b+14);
   }
-  // Left Y (torque)
+  // Left Y
   for(let yi=0;yi<=4;yi++){
     const py=bp.b-yi/4*(bp.b-bp.t);
     const v=(ax.lyMin+yi/4*(ax.lyMax-ax.lyMin)).toFixed(0)+'%';
-    ctx.fillStyle='rgba(34,211,238,0.85)';ctx.fillText(v,bp.l-32,py+4);
+    ctx.fillStyle=leftColor;ctx.fillText(v,bp.l-32,py+4);
   }
-  // Right Y (current)
+  // Right Y
   for(let yi=0;yi<=4;yi++){
     const py=bp.b-yi/4*(bp.b-bp.t);
     const v=(ax.ryMin+yi/4*(ax.ryMax-ax.ryMin)).toFixed(0)+'%';
-    ctx.fillStyle='rgba(251,191,36,0.85)';ctx.fillText(v,bp.r+4,py+4);
+    ctx.fillStyle=rightColor;ctx.fillText(v,bp.r+4,py+4);
   }
 
   // Box border
@@ -684,66 +734,71 @@ function drawSplineCurve(ctrls,curve,lw,alpha){
 
 function drawCtrlPoints(curve,ctrls,isActive){
   const col=COL[curve];
-  // Scale ring size with zoom — larger when zoomed out, smaller when zoomed in
-  const baseR = isActive?11:7;
-  const zoomFactor = 1 / Math.max(0.5, Math.min(ST.scale, 2)); // scale inversely with image scale
-  const R = Math.round(baseR * zoomFactor);
+  // FIXED small size - no zoom scaling (was causing issues)
+  const R = isActive ? 5 : 3;
+  
   const useRight=isRight(curve);
   const W=cv.width, H=cv.height;
-  const TOOLTIP_OFFSET=44;
+  const TOOLTIP_OFFSET=50;
+  const bp=getBP();
 
   ctrls.forEach((p,i)=>{
     if(!p) return;
     const cp=dataToCanvas(p.sp,p.val,useRight);
     const hov=ST.hovCtrl&&ST.hovCtrl.curve===curve&&ST.hovCtrl.idx===i;
-    const r=hov?R+4:R;
-    ctx.globalAlpha=isActive?0.95:0.45;
+    const r=hov?R+2:R;
+    
+    // Draw thin vertical guide line ONLY for hovered point
+    if(hov&&isActive){
+      ctx.strokeStyle=col;
+      ctx.globalAlpha=0.25;
+      ctx.lineWidth=1;
+      ctx.setLineDash([3,3]);
+      ctx.beginPath();
+      ctx.moveTo(cp.x, cp.y);
+      ctx.lineTo(cp.x, bp.b);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
-    // Transparent ring + center dot
+    ctx.globalAlpha=isActive?0.9:0.4;
+
+    // Small transparent ring + center dot
     ctx.strokeStyle=hov?'#fff':col;
-    ctx.lineWidth=hov?2.5:1.5;
+    ctx.lineWidth=hov?2:1;
     ctx.fillStyle='rgba(0,0,0,0)';
     ctx.beginPath();ctx.arc(cp.x,cp.y,r,0,Math.PI*2);
     ctx.fill();ctx.stroke();
 
     ctx.fillStyle=hov?'#fff':col;
-    ctx.beginPath();ctx.arc(cp.x,cp.y,3,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(cp.x,cp.y,1.5,0,Math.PI*2);
     ctx.fill();
 
-    // Speed label — positioned BELOW ring, well clear of curves
-    if(isActive){
-      const labelY = cp.y + r + 18; // 18px below ring edge
-      ctx.globalAlpha=0.85;
-      ctx.fillStyle='rgba(0,0,0,0.8)';
-      ctx.fillRect(cp.x-16,labelY-10,32,14);
-      ctx.fillStyle=col;
-      ctx.font='bold 8px JetBrains Mono,monospace';
-      ctx.fillText(S_POINTS[i]+'%',cp.x-14,labelY+2);
-    }
-
-    // Hover tooltip — smart above/below
+    // Hover tooltip only
     if(hov&&isActive){
-      const label=Math.round(Math.max(0,p.val))+'%';
-      ctx.font='bold 12px JetBrains Mono,monospace';
+      const speedLabel=S_POINTS[i]+'%';
+      const valLabel=Math.round(Math.max(0,p.val))+'%';
+      const label=`${speedLabel}: ${valLabel}`;
+      ctx.font='bold 10px JetBrains Mono,monospace';
       const tw=ctx.measureText(label).width;
-      const TW=tw+20, TH=26;
-      const ARROW=8;
+      const TW=tw+14, TH=22;
+      const ARROW=6;
 
-      const goBelow = cp.y - r - TOOLTIP_OFFSET - TH < 8;
+      const goBelow = cp.y - r - TOOLTIP_OFFSET - TH < 10;
       const tipY = goBelow ? cp.y + r + TOOLTIP_OFFSET : cp.y - r - TOOLTIP_OFFSET - TH;
       let tipX = cp.x - TW/2;
-      tipX = Math.max(8, Math.min(tipX, W - TW - 8));
+      tipX = Math.max(10, Math.min(tipX, W - TW - 10));
 
       ctx.globalAlpha=1;
-      ctx.fillStyle='rgba(10,12,16,0.96)';
-      roundRect(ctx, tipX, tipY, TW, TH, 6);
+      ctx.fillStyle='rgba(10,12,16,0.95)';
+      roundRect(ctx, tipX, tipY, TW, TH, 5);
       ctx.fill();
       ctx.strokeStyle=col;ctx.lineWidth=1.5;
-      roundRect(ctx, tipX, tipY, TW, TH, 6);
+      roundRect(ctx, tipX, tipY, TW, TH, 5);
       ctx.stroke();
 
-      const arrowCX=Math.min(Math.max(cp.x, tipX+12), tipX+TW-12);
-      ctx.fillStyle='rgba(10,12,16,0.96)';
+      const arrowCX=Math.min(Math.max(cp.x, tipX+10), tipX+TW-10);
+      ctx.fillStyle='rgba(10,12,16,0.95)';
       ctx.beginPath();
       if(goBelow){
         ctx.moveTo(arrowCX-ARROW/2, tipY);
@@ -757,8 +812,9 @@ function drawCtrlPoints(curve,ctrls,isActive){
       ctx.closePath();ctx.fill();
 
       ctx.fillStyle='#fff';
+      ctx.font='bold 10px JetBrains Mono,monospace';
       ctx.textAlign='center';
-      ctx.fillText(label, tipX+TW/2, tipY+TH-7);
+      ctx.fillText(label, tipX+TW/2, tipY+TH-6);
       ctx.textAlign='left';
     }
     ctx.globalAlpha=1;
