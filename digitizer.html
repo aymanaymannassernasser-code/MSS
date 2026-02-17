@@ -1,860 +1,908 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Curve Digitizer | Motor Starter</title>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #0a0c10;
-            --panel: #111318;
-            --border: #1e2535;
-            --accent: #22d3ee;
-            --green: #10b981;
-            --yellow: #fbbf24;
-            --red: #f43f5e;
-            --purple: #a855f7;
-            --text: #e2e8f0;
-            --muted: #64748b;
-            --step-inactive: #1e2535;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Curve Digitizer | Motor Starter</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c10; --panel:#111318; --border:#1e2535;
+  --accent:#22d3ee; --green:#10b981; --yellow:#fbbf24;
+  --red:#f43f5e; --purple:#a855f7; --muted:#64748b;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:#e2e8f0;font-family:'Rajdhani',sans-serif;
+  display:grid;grid-template-rows:56px 1fr;height:100vh;overflow:hidden;}
 
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+/* HEADER */
+header{background:#000;border-bottom:2px solid var(--accent);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px;}
+.htitle{font-size:1.3rem;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase;}
+.hsub{font-size:0.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.btn-back{background:none;border:1px solid var(--border);color:var(--muted);
+  padding:7px 14px;border-radius:6px;cursor:pointer;font-family:'Rajdhani';
+  font-size:0.85rem;font-weight:600;transition:all .2s;}
+.btn-back:hover{border-color:var(--accent);color:var(--accent);}
 
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'Rajdhani', sans-serif;
-            height: 100vh;
-            display: grid;
-            grid-template-rows: auto 1fr;
-            overflow: hidden;
-        }
+/* MAIN */
+.main{display:grid;grid-template-columns:320px 1fr;height:100%;overflow:hidden;}
 
-        /* ─── HEADER ─── */
-        header {
-            background: #000;
-            border-bottom: 2px solid var(--accent);
-            padding: 12px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-        }
-        header .title { font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
-        header .subtitle { font-size: 0.8rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
-        .btn-back {
-            background: none; border: 1px solid var(--border); color: var(--muted);
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Rajdhani';
-            font-size: 0.9rem; font-weight: 600; transition: all 0.2s;
-        }
-        .btn-back:hover { border-color: var(--accent); color: var(--accent); }
+/* SIDEBAR */
+.sidebar{background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;padding:16px;gap:14px;}
 
-        /* ─── MAIN LAYOUT ─── */
-        .main { display: grid; grid-template-columns: 340px 1fr; height: 100%; overflow: hidden; }
+/* STEP PILLS */
+.steps{display:flex;gap:5px;}
+.pill{flex:1;text-align:center;padding:7px 2px;border:1px solid var(--border);
+  border-radius:6px;font-size:0.65rem;font-weight:700;letter-spacing:.5px;
+  color:var(--muted);text-transform:uppercase;transition:all .3s;}
+.pill.active{border-color:var(--accent);color:var(--accent);background:rgba(34,211,238,.07);}
+.pill.done{border-color:var(--green);color:var(--green);background:rgba(16,185,129,.07);}
 
-        /* ─── SIDEBAR ─── */
-        .sidebar {
-            background: var(--panel);
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            padding: 20px;
-            gap: 20px;
-        }
+/* SECTION */
+.stitle{font-size:.65rem;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:var(--accent);margin-bottom:10px;}
+.panel{display:none;}
+.panel.active{display:block;}
 
-        /* ─── STEP PILLS ─── */
-        .steps { display: flex; gap: 6px; }
-        .step-pill {
-            flex: 1; text-align: center; padding: 8px 4px;
-            border: 1px solid var(--step-inactive); border-radius: 6px;
-            font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px;
-            color: var(--muted); background: transparent; cursor: default;
-            transition: all 0.3s; text-transform: uppercase;
-        }
-        .step-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(34,211,238,0.08); }
-        .step-pill.done { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
+/* UPLOAD */
+.upzone{border:2px dashed var(--border);border-radius:10px;padding:24px;
+  text-align:center;cursor:pointer;transition:all .2s;background:rgba(34,211,238,.02);}
+.upzone:hover,.upzone.drag{border-color:var(--accent);background:rgba(34,211,238,.06);}
+.upzone .ico{font-size:2.4rem;margin-bottom:8px;}
+.upzone .txt{font-size:.85rem;color:var(--muted);}
+.upzone .sub{font-size:.72rem;color:#334155;margin-top:5px;}
+#fileIn{display:none;}
 
-        /* ─── SECTION ─── */
-        .section-title {
-            font-size: 0.7rem; font-weight: 700; letter-spacing: 1px;
-            text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
-        }
+/* INPUTS */
+.ig{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.ig3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;}
+.fg label{display:block;font-size:.62rem;color:var(--muted);margin-bottom:3px;
+  font-weight:700;letter-spacing:.3px;text-transform:uppercase;}
+.fg input{width:100%;background:#0a0c10;border:1px solid var(--border);
+  color:#fff;padding:7px 9px;border-radius:5px;font-size:.82rem;
+  font-family:'JetBrains Mono',monospace;transition:border-color .2s;}
+.fg input:focus{border-color:var(--accent);outline:none;}
 
-        /* ─── UPLOAD ─── */
-        .upload-zone {
-            border: 2px dashed var(--border); border-radius: 10px;
-            padding: 28px; text-align: center; cursor: pointer;
-            transition: all 0.2s; background: rgba(34,211,238,0.02);
-        }
-        .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(34,211,238,0.06); }
-        .upload-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
-        .upload-zone .text { font-size: 0.9rem; color: var(--muted); }
-        .upload-zone .subtext { font-size: 0.75rem; color: #334155; margin-top: 6px; }
-        #fileInput { display: none; }
+/* INFO BOX */
+.infobox{padding:10px 12px;border-radius:7px;font-size:.76rem;
+  line-height:1.6;color:var(--muted);background:rgba(34,211,238,.04);
+  border:1px solid var(--border);}
+.infobox strong{color:#fff;}
+.infobox.warn{background:rgba(251,191,36,.05);border-color:rgba(251,191,36,.3);color:var(--yellow);}
+.infobox.ok{background:rgba(16,185,129,.05);border-color:rgba(16,185,129,.3);color:var(--green);}
 
-        /* ─── CALIBRATION ─── */
-        .calib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .calib-field label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; font-weight: 700; letter-spacing: 0.3px; }
-        .calib-field input {
-            width: 100%; background: #0a0c10; border: 1px solid var(--border);
-            color: #fff; padding: 8px 10px; border-radius: 6px;
-            font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;
-        }
-        .calib-field input:focus { border-color: var(--accent); outline: none; }
-        .calib-status {
-            padding: 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
-            margin-top: 10px; text-align: center; background: rgba(34,211,238,0.05);
-            border: 1px solid var(--border); color: var(--muted);
-        }
-        .calib-status.ready { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
+/* CURVE BTNS */
+.curve-btns{display:flex;flex-direction:column;gap:7px;}
+.cbtn{padding:10px 14px;border-radius:7px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;gap:10px;font-family:'Rajdhani';
+  font-size:.88rem;font-weight:600;transition:all .2s;text-align:left;}
+.cbtn .dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.cbtn .cnt{margin-left:auto;font-size:.68rem;font-family:'JetBrains Mono';}
+.cbtn:hover{color:#fff;border-color:#2d3748;}
+.cbtn.mt.active{border-color:var(--accent);background:rgba(34,211,238,.08);color:#fff;}
+.cbtn.mc.active{border-color:var(--yellow);background:rgba(251,191,36,.08);color:#fff;}
+.cbtn.lt.active{border-color:var(--red);background:rgba(244,63,94,.08);color:#fff;}
 
-        /* ─── CURVE SELECTOR ─── */
-        .curve-btns { display: flex; flex-direction: column; gap: 8px; }
-        .curve-btn {
-            padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
-            background: transparent; color: var(--muted); cursor: pointer;
-            display: flex; align-items: center; gap: 12px;
-            font-family: 'Rajdhani'; font-size: 0.9rem; font-weight: 600;
-            transition: all 0.2s; text-align: left;
-        }
-        .curve-btn .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-        .curve-btn .count { margin-left: auto; font-size: 0.7rem; font-family: 'JetBrains Mono'; }
-        .curve-btn:hover { border-color: #2d3748; color: #fff; }
-        .curve-btn.active { color: #fff; }
-        .curve-btn.mt.active  { border-color: var(--accent); background: rgba(34,211,238,0.08); }
-        .curve-btn.mc.active  { border-color: var(--yellow); background: rgba(251,191,36,0.08); }
-        .curve-btn.lt.active  { border-color: var(--red); background: rgba(244,63,94,0.08); }
+/* ACTION BTNS */
+.abtn{padding:11px;border:none;border-radius:7px;font-family:'Rajdhani';
+  font-size:.88rem;font-weight:700;cursor:pointer;text-transform:uppercase;
+  letter-spacing:.4px;transition:all .2s;display:flex;align-items:center;
+  justify-content:center;gap:7px;width:100%;margin-bottom:8px;}
+.abtn-undo{background:rgba(244,63,94,.1);border:1px solid var(--red);color:var(--red);}
+.abtn-undo:hover{background:rgba(244,63,94,.2);}
+.abtn-clear{background:rgba(100,116,139,.1);border:1px solid #334155;color:var(--muted);}
+.abtn-clear:hover{background:rgba(100,116,139,.2);color:#fff;}
+.abtn-go{background:var(--accent);color:#000;font-size:.95rem;font-weight:800;}
+.abtn-go:hover{background:#06b6d4;}
+.abtn-apply{background:var(--green);color:#000;font-size:.95rem;font-weight:800;}
+.abtn-apply:hover{background:#059669;}
+.abtn-back{background:transparent;border:1px solid var(--border);color:var(--muted);}
+.abtn-back:hover{border-color:var(--accent);color:var(--accent);}
 
-        /* ─── TRACE CONTROLS ─── */
-        .trace-controls { display: flex; flex-direction: column; gap: 10px; }
-        .btn-action {
-            padding: 12px; border: none; border-radius: 8px;
-            font-family: 'Rajdhani'; font-size: 0.9rem; font-weight: 700;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
-            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .btn-undo { background: rgba(244,63,94,0.1); border: 1px solid var(--red); color: var(--red); }
-        .btn-undo:hover { background: rgba(244,63,94,0.2); }
-        .btn-clear { background: rgba(100,116,139,0.1); border: 1px solid #334155; color: var(--muted); }
-        .btn-clear:hover { background: rgba(100,116,139,0.2); color: #fff; }
-        .btn-extract { background: var(--green); color: #000; font-size: 0.95rem; }
-        .btn-extract:hover { background: #059669; }
-        .btn-apply { background: var(--accent); color: #000; font-size: 1rem; font-weight: 800; }
-        .btn-apply:hover { background: #06b6d4; }
-        .btn-apply:disabled { background: #1e2535; color: var(--muted); cursor: not-allowed; }
+/* MODE BADGE */
+.mode-badge{display:inline-block;padding:3px 9px;border-radius:4px;
+  font-size:.68rem;font-weight:700;letter-spacing:.3px;margin-left:6px;}
 
-        /* ─── EXTRACTED TABLE ─── */
-        .extracted-table {
-            max-height: 200px; overflow-y: auto;
-            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
-        }
-        .extracted-table table { width: 100%; border-collapse: collapse; }
-        .extracted-table th {
-            padding: 6px 8px; background: #0a0c10; color: var(--muted);
-            font-size: 0.65rem; text-transform: uppercase; position: sticky; top: 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .extracted-table td { padding: 5px 8px; border-bottom: 1px solid #0f1219; text-align: right; }
-        .extracted-table td:first-child { color: var(--muted); text-align: left; }
-        .extracted-table td.mt { color: var(--accent); }
-        .extracted-table td.mc { color: var(--yellow); }
-        .extracted-table td.lt { color: var(--red); }
-        .extracted-table td.empty { color: #1e2535; }
+/* EXTRACTED TABLE */
+.etable{max-height:220px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:.7rem;}
+.etable table{width:100%;border-collapse:collapse;}
+.etable th{padding:5px 6px;background:#0a0c10;color:var(--muted);
+  font-size:.62rem;text-transform:uppercase;position:sticky;top:0;
+  border-bottom:1px solid var(--border);}
+.etable td{padding:4px 6px;border-bottom:1px solid #0f1219;text-align:right;}
+.etable td:first-child{color:var(--muted);text-align:left;}
+.etable .cmt{color:var(--accent);} .etable .cmc{color:var(--yellow);}
+.etable .clt{color:var(--red);} .etable .cem{color:#1e2535;}
 
-        /* ─── CANVAS AREA ─── */
-        .canvas-area {
-            position: relative; overflow: hidden; background: #000;
-            display: flex; align-items: center; justify-content: center;
-        }
-        #mainCanvas {
-            position: absolute; top: 0; left: 0;
-            touch-action: none; cursor: crosshair;
-            max-width: 100%; max-height: 100%;
-        }
-        .canvas-placeholder {
-            text-align: center; color: #1e2535; pointer-events: none;
-        }
-        .canvas-placeholder .big { font-size: 5rem; margin-bottom: 20px; }
-        .canvas-placeholder .msg { font-size: 1.1rem; font-weight: 600; }
+/* CANVAS AREA */
+.canvas-area{position:relative;overflow:hidden;background:#060810;
+  display:flex;align-items:center;justify-content:center;}
+#cv{position:absolute;top:0;left:0;touch-action:none;}
+.cv-hint{text-align:center;color:#1e2535;pointer-events:none;z-index:0;}
+.cv-hint .big{font-size:4rem;margin-bottom:16px;}
+.cv-hint .msg{font-size:1rem;font-weight:600;}
 
-        /* ─── TOAST ─── */
-        .toast {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
-            background: #111318; border: 1px solid var(--accent); color: var(--accent);
-            padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
-            transition: transform 0.3s ease; z-index: 999; white-space: nowrap;
-        }
-        .toast.show { transform: translateX(-50%) translateY(0); }
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(100px);
+  background:#111318;border:1px solid var(--accent);color:var(--accent);
+  padding:11px 22px;border-radius:8px;font-size:.88rem;font-weight:600;
+  transition:transform .3s;z-index:9999;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
 
-        /* ─── MOBILE ─── */
-        @media (max-width: 768px) {
-            body { grid-template-rows: auto auto 1fr; overflow: auto; height: auto; }
-            .main { grid-template-columns: 1fr; height: auto; }
-            .sidebar { overflow-y: visible; }
-            .canvas-area { height: 60vw; min-height: 300px; }
-            #mainCanvas { position: relative; }
-        }
-    </style>
+/* MOBILE */
+@media(max-width:768px){
+  body{grid-template-rows:auto auto 1fr;overflow:auto;height:auto;}
+  .main{grid-template-columns:1fr;}
+  .canvas-area{height:65vw;min-height:280px;}
+  #cv{position:relative;}
+}
+</style>
 </head>
 <body>
 
 <header>
-    <div>
-        <div class="title">📐 Curve Digitizer</div>
-        <div class="subtitle">Transform datasheets into physics data in 30 seconds</div>
-    </div>
-    <button class="btn-back" onclick="goBack()">← Back to Simulator</button>
+  <div>
+    <div class="htitle">📐 Curve Digitizer</div>
+    <div class="hsub">Trace datasheet curves → physics data in 30 seconds</div>
+  </div>
+  <button class="btn-back" onclick="window.location.href='index.html'">← Back</button>
 </header>
 
 <div class="main">
-    <!-- ─── SIDEBAR ─── -->
-    <aside class="sidebar">
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside class="sidebar">
+  <div class="steps">
+    <div class="pill active" id="p1">1 Upload</div>
+    <div class="pill" id="p2">2 Scale</div>
+    <div class="pill" id="p3">3 Trace</div>
+    <div class="pill" id="p4">4 Refine</div>
+    <div class="pill" id="p5">5 Apply</div>
+  </div>
 
-        <!-- STEP PILLS -->
-        <div class="steps">
-            <div class="step-pill active" id="pill1">1 Upload</div>
-            <div class="step-pill" id="pill2">2 Calibrate</div>
-            <div class="step-pill" id="pill3">3 Trace</div>
-            <div class="step-pill" id="pill4">4 Apply</div>
-        </div>
-
-        <!-- STEP 1: UPLOAD -->
-        <div id="step1Panel">
-            <div class="section-title">📷 Upload Datasheet</div>
-            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                <div class="icon">🗂️</div>
-                <div class="text">Tap to upload photo</div>
-                <div class="subtext">JPG, PNG, PDF screenshot<br>Camera or gallery works!</div>
-            </div>
-            <input type="file" id="fileInput" accept="image/*">
-        </div>
-
-        <!-- STEP 2: CALIBRATE -->
-        <div id="step2Panel" style="display:none">
-            <div class="section-title">📏 Axis Calibration</div>
-            <p style="font-size:0.8rem; color:var(--muted); margin-bottom:14px; line-height:1.5;">
-                Enter the axis limits, then <strong style="color:#fff">click 4 calibration points</strong> on the chart:
-            </p>
-            <div style="background:rgba(34,211,238,0.05); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.8rem; line-height:1.8; color:var(--muted);">
-                <span style="color:var(--accent)">①</span> X-axis MIN (0% speed)<br>
-                <span style="color:var(--accent)">②</span> X-axis MAX (100% speed)<br>
-                <span style="color:var(--accent)">③</span> Y-axis MIN (0%)<br>
-                <span style="color:var(--accent)">④</span> Y-axis MAX (e.g. 200%)
-            </div>
-            <div class="calib-grid">
-                <div class="calib-field">
-                    <label>X Min (speed%)</label>
-                    <input type="number" id="xMinVal" value="0">
-                </div>
-                <div class="calib-field">
-                    <label>X Max (speed%)</label>
-                    <input type="number" id="xMaxVal" value="100">
-                </div>
-                <div class="calib-field">
-                    <label>Y Min (%)</label>
-                    <input type="number" id="yMinVal" value="0">
-                </div>
-                <div class="calib-field">
-                    <label>Y Max (%)</label>
-                    <input type="number" id="yMaxVal" value="200">
-                </div>
-            </div>
-            <div class="calib-status" id="calibStatus">
-                Click 4 calibration points on the chart image
-            </div>
-            <button class="btn-action" style="margin-top:12px; background:rgba(34,211,238,0.1); border:1px solid var(--accent); color:var(--accent); font-family:Rajdhani; font-size:0.9rem; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; text-transform:uppercase; width:100%;"
-                onclick="resetCalibration()">↺ Reset Points</button>
-        </div>
-
-        <!-- STEP 3: TRACE -->
-        <div id="step3Panel" style="display:none">
-            <div class="section-title">✏️ Trace Curves</div>
-            <p style="font-size:0.8rem; color:var(--muted); margin-bottom:12px; line-height:1.5;">
-                Select a curve, then <strong style="color:#fff">drag your finger</strong> along it on the chart.
-            </p>
-            <div class="curve-btns">
-                <button class="curve-btn mt active" id="btnMT" onclick="selectCurve('mt')">
-                    <span class="dot" style="background:var(--accent)"></span>
-                    Motor Torque (%)
-                    <span class="count" id="countMT">0 pts</span>
-                </button>
-                <button class="curve-btn mc" id="btnMC" onclick="selectCurve('mc')">
-                    <span class="dot" style="background:var(--yellow)"></span>
-                    Motor Current (%)
-                    <span class="count" id="countMC">0 pts</span>
-                </button>
-                <button class="curve-btn lt" id="btnLT" onclick="selectCurve('lt')">
-                    <span class="dot" style="background:var(--red)"></span>
-                    Load Torque (%)
-                    <span class="count" id="countLT">0 pts</span>
-                </button>
-            </div>
-            <div class="trace-controls" style="margin-top:14px;">
-                <button class="btn-action btn-undo" onclick="undoLastPoint()">↩ Undo Last Point</button>
-                <button class="btn-action btn-clear" onclick="clearCurrentCurve()">✕ Clear This Curve</button>
-                <button class="btn-action btn-extract" onclick="extractAndPreview()">⚡ Extract & Preview</button>
-            </div>
-        </div>
-
-        <!-- STEP 4: APPLY -->
-        <div id="step4Panel" style="display:none">
-            <div class="section-title">📊 Extracted Values</div>
-            <div class="extracted-table" id="extractedTable"></div>
-            <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
-                <button class="btn-action btn-clear" onclick="goToStep(3)">← Back to Trace</button>
-                <button class="btn-action btn-apply" id="btnApply" onclick="applyToSimulator()">
-                    ✅ Apply to Simulator
-                </button>
-            </div>
-        </div>
-
-    </aside>
-
-    <!-- ─── CANVAS AREA ─── -->
-    <div class="canvas-area" id="canvasArea">
-        <div class="canvas-placeholder" id="placeholder">
-            <div class="big">📊</div>
-            <div class="msg">Upload a datasheet image to begin</div>
-        </div>
-        <canvas id="mainCanvas"></canvas>
+  <!-- ── STEP 1: UPLOAD ── -->
+  <div class="panel active" id="s1">
+    <div class="stitle">📷 Upload Datasheet</div>
+    <div class="upzone" id="upzone" onclick="document.getElementById('fileIn').click()">
+      <div class="ico">🗂️</div>
+      <div class="txt">Tap to upload photo</div>
+      <div class="sub">JPG · PNG · screenshot<br>Camera or gallery</div>
     </div>
+    <input type="file" id="fileIn" accept="image/*">
+    <div class="infobox" style="margin-top:12px;">
+      After uploading, you'll enter axis scales and drag a <strong>boundary box</strong> to match the chart area.
+    </div>
+  </div>
+
+  <!-- ── STEP 2: SCALE ── -->
+  <div class="panel" id="s2">
+    <div class="stitle">📏 Axis Scales</div>
+    <div class="infobox" style="margin-bottom:12px;">
+      Enter the <strong>axis limits</strong> from the datasheet labels. Then <strong>drag the cyan boundary box</strong> on the image to align with the chart plot area.
+    </div>
+
+    <div class="ig" style="margin-bottom:4px;">
+      <div class="fg"><label>X Min (speed%)</label><input type="number" id="xMin" value="0" oninput="redraw()"></div>
+      <div class="fg"><label>X Max (speed%)</label><input type="number" id="xMax" value="100" oninput="redraw()"></div>
+    </div>
+
+    <div style="font-size:.65rem;color:var(--accent);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin:8px 0 5px;">Left Y — Torque (%)</div>
+    <div class="ig" style="margin-bottom:4px;">
+      <div class="fg"><label>Torque Min</label><input type="number" id="lyMin" value="0" oninput="redraw()"></div>
+      <div class="fg"><label>Torque Max</label><input type="number" id="lyMax" value="200" oninput="redraw()"></div>
+    </div>
+
+    <div style="font-size:.65rem;color:var(--yellow);font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin:8px 0 5px;">Right Y — Current (%)</div>
+    <div class="ig" style="margin-bottom:4px;">
+      <div class="fg"><label>Current Min</label><input type="number" id="ryMin" value="0" oninput="redraw()"></div>
+      <div class="fg"><label>Current Max</label><input type="number" id="ryMax" value="600" oninput="redraw()"></div>
+    </div>
+
+    <div class="infobox ok" id="boxStatus" style="margin:10px 0;">
+      ✋ Drag the <strong>cyan box corners/edges</strong> on the image to align with the chart axes
+    </div>
+
+    <button class="abtn abtn-go" onclick="goStep(3)">✓ Scales Set → Start Tracing</button>
+  </div>
+
+  <!-- ── STEP 3: TRACE ── -->
+  <div class="panel" id="s3">
+    <div class="stitle">✏️ Trace Curves</div>
+    <div class="infobox" style="margin-bottom:12px;">
+      Select curve type, then <strong>drag your finger</strong> along it.<br>
+      Motor Current uses the <span style="color:var(--yellow)">right Y axis</span>.
+    </div>
+    <div class="curve-btns">
+      <button class="cbtn mt active" id="bMT" onclick="setCurve('mt')">
+        <span class="dot" style="background:var(--accent)"></span>
+        Motor Torque
+        <span class="mode-badge" style="background:rgba(34,211,238,.15);color:var(--accent)">Left Y</span>
+        <span class="cnt" id="cMT">0 pts</span>
+      </button>
+      <button class="cbtn mc" id="bMC" onclick="setCurve('mc')">
+        <span class="dot" style="background:var(--yellow)"></span>
+        Motor Current
+        <span class="mode-badge" style="background:rgba(251,191,36,.15);color:var(--yellow)">Right Y</span>
+        <span class="cnt" id="cMC">0 pts</span>
+      </button>
+      <button class="cbtn lt" id="bLT" onclick="setCurve('lt')">
+        <span class="dot" style="background:var(--red)"></span>
+        Load Torque
+        <span class="mode-badge" style="background:rgba(244,63,94,.15);color:var(--red)">Left Y</span>
+        <span class="cnt" id="cLT">0 pts</span>
+      </button>
+    </div>
+    <div style="margin-top:12px;">
+      <button class="abtn abtn-undo" onclick="undoLast()">↩ Undo Last Point</button>
+      <button class="abtn abtn-clear" onclick="clearCurve()">✕ Clear This Curve</button>
+      <button class="abtn abtn-go" onclick="doExtract()">⚡ Extract → Refine Points</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: REFINE ── -->
+  <div class="panel" id="s4">
+    <div class="stitle">🧲 Refine Control Points</div>
+    <div class="infobox" style="margin-bottom:12px;">
+      Each curve shows <strong>19 draggable points</strong> at the exact speed locations needed.<br>
+      <strong>Drag any point</strong> to fine-tune where it sits on the curve.
+    </div>
+    <div class="curve-btns" style="margin-bottom:12px;">
+      <button class="cbtn mt active" id="rMT" onclick="setRefine('mt')">
+        <span class="dot" style="background:var(--accent)"></span> Motor Torque
+        <span class="cnt" style="color:var(--accent)">Left Y</span>
+      </button>
+      <button class="cbtn mc" id="rMC" onclick="setRefine('mc')">
+        <span class="dot" style="background:var(--yellow)"></span> Motor Current
+        <span class="cnt" style="color:var(--yellow)">Right Y</span>
+      </button>
+      <button class="cbtn lt" id="rLT" onclick="setRefine('lt')">
+        <span class="dot" style="background:var(--red)"></span> Load Torque
+        <span class="cnt" style="color:var(--red)">Left Y</span>
+      </button>
+    </div>
+    <div class="infobox warn" style="margin-bottom:12px;">
+      💡 Hover/tap a point to see its value. Drag it up/down to correct.
+    </div>
+    <button class="abtn abtn-back" onclick="goStep(3)">← Re-trace</button>
+    <button class="abtn abtn-go" onclick="goStep(5)">✅ Done → Preview & Apply</button>
+  </div>
+
+  <!-- ── STEP 5: APPLY ── -->
+  <div class="panel" id="s5">
+    <div class="stitle">📊 Final Values</div>
+    <div class="etable" id="etable"></div>
+    <div style="margin-top:12px;">
+      <button class="abtn abtn-back" onclick="goStep(4)">← Back to Refine</button>
+      <button class="abtn abtn-apply" onclick="applyData()">✅ Apply to Simulator</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════════ CANVAS ══════════════ -->
+<div class="canvas-area" id="ca">
+  <div class="cv-hint" id="hint">
+    <div class="big">📊</div>
+    <div class="msg">Upload a datasheet image to begin</div>
+  </div>
+  <canvas id="cv"></canvas>
+</div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ─────────────────────────────────────────────
-//  STATE
-// ─────────────────────────────────────────────
-const S_POINTS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100];
-const COLORS = { mt: '#22d3ee', mc: '#fbbf24', lt: '#f43f5e' };
-const CURVE_LABELS = { mt: 'Motor Torque', mc: 'Motor Current', lt: 'Load Torque' };
+// ═══════════════════════════════════════════════
+// CONSTANTS & STATE
+// ═══════════════════════════════════════════════
+const S_POINTS = [0,10,20,30,40,50,60,70,80,82,84,86,88,90,92,94,96,98,100];
+const COL = { mt:'#22d3ee', mc:'#fbbf24', lt:'#f43f5e' };
+const CURVES = ['mt','mc','lt'];
+
+// Chart boundary box state (in canvas pixels)
+let box = { l:0.15, t:0.12, r:0.85, b:0.88 }; // as fractions of canvas size
 
 let state = {
-    step: 1,
-    image: null,
-    imageW: 0, imageH: 0,
-    // Calibration: pixel coordinates of 4 clicked points
-    calibPoints: [],      // [{px, py}, ...] up to 4
-    calibStep: 0,         // 0=none,1=xmin,2=xmax,3=ymin,4=ymax done
-    // Raw traced points per curve (pixel coords)
-    rawPoints: { mt: [], mc: [], lt: [] },
-    // Extracted values at S_POINTS
-    extracted: { mt: [], mc: [], lt: [] },
-    activeCurve: 'mt',
-    isDrawing: false,
-    canvasScale: 1,       // image scale factor on canvas
-    offsetX: 0, offsetY: 0 // image offset on canvas
+  step: 1,
+  img: null, imgW:0, imgH:0,
+  scale:1, offX:0, offY:0,       // image→canvas transform
+  raw: { mt:[], mc:[], lt:[] },  // traced pixel coords (canvas)
+  ctrl: { mt:[], mc:[], lt:[] }, // 19 control points per curve (canvas pixels)
+  activeCurve: 'mt',
+  refineActive: 'mt',
+  dragBox: null,    // 'l','r','t','b','tl','tr','bl','br','move'
+  dragCtrl: null,   // {curve, idx}
+  drawing: false,
+  hoveredCtrl: null
 };
 
-const canvas = document.getElementById('mainCanvas');
-const ctx = canvas.getContext('2d');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
 
-// ─────────────────────────────────────────────
-//  FILE UPLOAD
-// ─────────────────────────────────────────────
-document.getElementById('fileInput').addEventListener('change', e => {
-    const file = e.target.files[0];
-    if (file) loadImage(file);
+// ═══════════════════════════════════════════════
+// STEP NAVIGATION
+// ═══════════════════════════════════════════════
+function goStep(n){
+  state.step = n;
+  for(let i=1;i<=5;i++){
+    document.getElementById('s'+i).classList.toggle('active', i===n);
+    const p = document.getElementById('p'+i);
+    p.className = 'pill' + (i<n?' done':i===n?' active':'');
+  }
+  redraw();
+}
+
+// ═══════════════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════════════
+document.getElementById('fileIn').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(f) loadImg(f);
+});
+const uz = document.getElementById('upzone');
+uz.addEventListener('dragover', e=>{e.preventDefault();uz.classList.add('drag');});
+uz.addEventListener('dragleave', ()=>uz.classList.remove('drag'));
+uz.addEventListener('drop', e=>{
+  e.preventDefault(); uz.classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f && f.type.startsWith('image/')) loadImg(f);
 });
 
-const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
-uploadZone.addEventListener('drop', e => {
-    e.preventDefault(); uploadZone.classList.remove('drag');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) loadImage(file);
-});
-
-function loadImage(file) {
-    const reader = new FileReader();
-    reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-            state.image = img;
-            state.imageW = img.width;
-            state.imageH = img.height;
-            document.getElementById('placeholder').style.display = 'none';
-            fitAndDrawImage();
-            goToStep(2);
-            showToast('Image loaded! Now set calibration points.');
-        };
-        img.src = e.target.result;
+function loadImg(f){
+  const r=new FileReader();
+  r.onload = e => {
+    const img=new Image();
+    img.onload = ()=>{
+      state.img=img; state.imgW=img.width; state.imgH=img.height;
+      document.getElementById('hint').style.display='none';
+      fitCanvas();
+      goStep(2);
+      showToast('Image loaded! Set axis scales and align the boundary box.');
     };
-    reader.readAsDataURL(file);
+    img.src=e.target.result;
+  };
+  r.readAsDataURL(f);
 }
 
-function fitAndDrawImage() {
-    const area = document.getElementById('canvasArea');
-    const W = area.clientWidth, H = area.clientHeight;
-    canvas.width = W; canvas.height = H;
-
-    const scaleX = W / state.imageW;
-    const scaleY = H / state.imageH;
-    state.canvasScale = Math.min(scaleX, scaleY);
-    state.offsetX = (W - state.imageW * state.canvasScale) / 2;
-    state.offsetY = (H - state.imageH * state.canvasScale) / 2;
-
-    redraw();
+// ═══════════════════════════════════════════════
+// FIT CANVAS
+// ═══════════════════════════════════════════════
+function fitCanvas(){
+  const a=document.getElementById('ca');
+  const W=a.clientWidth, H=a.clientHeight;
+  cv.width=W; cv.height=H;
+  const sx=W/state.imgW, sy=H/state.imgH;
+  state.scale=Math.min(sx,sy);
+  state.offX=(W-state.imgW*state.scale)/2;
+  state.offY=(H-state.imgH*state.scale)/2;
+  // Init box as fraction of canvas
+  box={l:0.15,t:0.12,r:0.85,b:0.88};
+  redraw();
 }
 
-// ─────────────────────────────────────────────
-//  COORDINATE TRANSFORMS
-// ─────────────────────────────────────────────
-// Canvas pixel → image pixel
-function canvasToImg(cx, cy) {
-    return {
-        x: (cx - state.offsetX) / state.canvasScale,
-        y: (cy - state.offsetY) / state.canvasScale
-    };
+// ═══════════════════════════════════════════════
+// COORDINATE TRANSFORMS
+// ═══════════════════════════════════════════════
+function getAxisScale(){
+  return {
+    xMin: parseFloat(document.getElementById('xMin').value)||0,
+    xMax: parseFloat(document.getElementById('xMax').value)||100,
+    lyMin: parseFloat(document.getElementById('lyMin').value)||0,
+    lyMax: parseFloat(document.getElementById('lyMax').value)||200,
+    ryMin: parseFloat(document.getElementById('ryMin').value)||0,
+    ryMax: parseFloat(document.getElementById('ryMax').value)||600
+  };
 }
 
-// Image pixel → data coordinates (using 4 calibration points)
-// calib[0]=xMin, calib[1]=xMax, calib[2]=yMin, calib[3]=yMax
-function imgToData(ix, iy) {
-    const cp = state.calibPoints;
-    if (cp.length < 4) return null;
-
-    const xMinPx = cp[0].x, xMaxPx = cp[1].x;
-    const yMinPy = cp[3].y, yMaxPy = cp[2].y;   // Note: yMin is LOWER on image (higher pixel Y)
-
-    const xMinVal = parseFloat(document.getElementById('xMinVal').value) || 0;
-    const xMaxVal = parseFloat(document.getElementById('xMaxVal').value) || 100;
-    const yMinVal = parseFloat(document.getElementById('yMinVal').value) || 0;
-    const yMaxVal = parseFloat(document.getElementById('yMaxVal').value) || 200;
-
-    const dataX = xMinVal + (ix - xMinPx) / (xMaxPx - xMinPx) * (xMaxVal - xMinVal);
-    // Y axis: image Y increases downward, data Y increases upward
-    const dataY = yMinVal + (iy - yMinPy) / (yMaxPy - yMinPy) * (yMaxVal - yMinVal);
-
-    return { x: dataX, y: dataY };
+// Box in actual canvas pixels
+function getBoxPx(){
+  const W=cv.width, H=cv.height;
+  return { l:box.l*W, t:box.t*H, r:box.r*W, b:box.b*H };
 }
 
-// Canvas pixel → data coordinate
-function canvasToData(cx, cy) {
-    const img = canvasToImg(cx, cy);
-    return imgToData(img.x, img.y);
+// Canvas pixel → data value
+function canvasToData(cx, cy, useRight=false){
+  const bp=getBoxPx();
+  const sc=getAxisScale();
+  const fx=(cx-bp.l)/(bp.r-bp.l);
+  const fy=(cy-bp.t)/(bp.b-bp.t); // 0=top, 1=bottom
+  const dataX=sc.xMin+fx*(sc.xMax-sc.xMin);
+  let dataY;
+  if(useRight){
+    dataY=sc.ryMax+(fy)*(sc.ryMin-sc.ryMax); // inverted
+  } else {
+    dataY=sc.lyMax+(fy)*(sc.lyMin-sc.lyMax);
+  }
+  return {x:dataX, y:dataY};
 }
 
-// ─────────────────────────────────────────────
-//  DRAWING
-// ─────────────────────────────────────────────
-function redraw() {
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+// Data value → canvas pixel
+function dataToCanvas(dataX, dataY, useRight=false){
+  const bp=getBoxPx();
+  const sc=getAxisScale();
+  const fx=(dataX-sc.xMin)/(sc.xMax-sc.xMin);
+  let fy;
+  if(useRight){
+    fy=(sc.ryMax-dataY)/(sc.ryMax-sc.ryMin);
+  } else {
+    fy=(sc.lyMax-dataY)/(sc.lyMax-sc.lyMin);
+  }
+  return { x:bp.l+fx*(bp.r-bp.l), y:bp.t+fy*(bp.b-bp.t) };
+}
 
-    // Draw image
-    if (state.image) {
-        ctx.drawImage(state.image,
-            state.offsetX, state.offsetY,
-            state.imageW * state.canvasScale,
-            state.imageH * state.canvasScale);
+function isRightAxis(curve){ return curve==='mc'; }
+
+// ═══════════════════════════════════════════════
+// EXTRACT: raw traced points → 19 control points
+// ═══════════════════════════════════════════════
+function extractToCtrls(curve){
+  const pts = state.raw[curve];
+  if(pts.length<2) return null;
+  const useRight = isRightAxis(curve);
+
+  // Convert canvas pixels → data, sort by X
+  const data = pts.map(p=>canvasToData(p.x,p.y,useRight))
+    .filter(d=>d.x>=-5&&d.x<=105)
+    .sort((a,b)=>a.x-b.x);
+  if(data.length<2) return null;
+
+  // For each S_POINT, interpolate data Y then convert back to canvas pixel
+  return S_POINTS.map(sp=>{
+    // Linear interp in data space
+    let lo=data[0], hi=data[data.length-1];
+    for(let i=0;i<data.length-1;i++){
+      if(data[i].x<=sp && data[i+1].x>=sp){ lo=data[i]; hi=data[i+1]; break; }
     }
+    const t = (hi.x===lo.x) ? 0 : (sp-lo.x)/(hi.x-lo.x);
+    const dataY = lo.y + t*(hi.y-lo.y);
+    return dataToCanvas(sp, dataY, useRight);
+  });
+}
 
-    // Draw calibration points
-    const calibColors = ['#22d3ee', '#22d3ee', '#f43f5e', '#f43f5e'];
-    const calibLabels = ['X-Min', 'X-Max', 'Y-Max', 'Y-Min'];
-    state.calibPoints.forEach((p, i) => {
-        const cx = p.x * state.canvasScale + state.offsetX;
-        const cy = p.y * state.canvasScale + state.offsetY;
-        drawCalibMarker(cx, cy, calibLabels[i], calibColors[i]);
+function doExtract(){
+  let count=0;
+  CURVES.forEach(c=>{
+    if(state.raw[c].length>=2){
+      const ctrls = extractToCtrls(c);
+      if(ctrls){ state.ctrl[c]=ctrls; count++; }
+    }
+  });
+  if(count===0){
+    showToast('⚠️ Trace at least one curve first!');
+    return;
+  }
+  showToast(`✅ Extracted ${count} curve(s) → drag points to refine!`);
+  goStep(4);
+  redraw();
+}
+
+// ═══════════════════════════════════════════════
+// REFINE
+// ═══════════════════════════════════════════════
+function setRefine(c){
+  state.refineActive=c;
+  ['mt','mc','lt'].forEach(x=>{
+    document.getElementById('r'+x.toUpperCase()).classList.toggle('active',x===c);
+  });
+  redraw();
+}
+
+function setCurve(c){
+  state.activeCurve=c;
+  ['MT','MC','LT'].forEach(x=>{
+    document.getElementById('b'+x).classList.toggle('active',x===c.toUpperCase());
+  });
+}
+
+function undoLast(){
+  state.raw[state.activeCurve].pop();
+  updateCounts();
+  redraw();
+}
+
+function clearCurve(){
+  state.raw[state.activeCurve]=[];
+  updateCounts();
+  redraw();
+}
+
+function updateCounts(){
+  ['mt','mc','lt'].forEach(c=>{
+    document.getElementById('c'+c.toUpperCase()).textContent=state.raw[c].length+' pts';
+  });
+}
+
+// ═══════════════════════════════════════════════
+// APPLY
+// ═══════════════════════════════════════════════
+function goStep5(){
+  renderExtracted();
+  goStep(5);
+}
+
+function renderExtracted(){
+  const sc=getAxisScale();
+  // Convert ctrl points back to data values
+  const vals={mt:[], mc:[], lt:[]};
+  CURVES.forEach(c=>{
+    vals[c]=state.ctrl[c].map(pt=>{
+      if(!pt) return null;
+      const useRight=isRightAxis(c);
+      const d=canvasToData(pt.x,pt.y,useRight);
+      return Math.max(0,Math.round(d.y));
+    });
+  });
+
+  let html=`<table><thead><tr>
+    <th>Speed</th>
+    <th style="color:var(--accent)">T%</th>
+    <th style="color:var(--yellow)">I%</th>
+    <th style="color:var(--red)">Lt%</th>
+  </tr></thead><tbody>`;
+  S_POINTS.forEach((sp,i)=>{
+    const mt=vals.mt[i]??null, mc=vals.mc[i]??null, lt=vals.lt[i]??null;
+    html+=`<tr>
+      <td>${sp}%</td>
+      <td class="${mt!==null?'cmt':'cem'}">${mt!==null?mt:'–'}</td>
+      <td class="${mc!==null?'cmc':'cem'}">${mc!==null?mc:'–'}</td>
+      <td class="${lt!==null?'clt':'cem'}">${lt!==null?lt:'–'}</td>
+    </tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('etable').innerHTML=html;
+  state._vals=vals;
+}
+
+function applyData(){
+  if(!state._vals){ renderExtracted(); }
+  localStorage.setItem('digitizerData', JSON.stringify(state._vals));
+  showToast('✅ Applied! Returning to simulator...');
+  setTimeout(()=>window.location.href='index.html', 900);
+}
+
+// ═══════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════
+function redraw(){
+  if(!cv.width) return;
+  const W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  // Draw image
+  if(state.img){
+    ctx.drawImage(state.img,state.offX,state.offY,
+      state.imgW*state.scale, state.imgH*state.scale);
+  } else return;
+
+  const bp=getBoxPx();
+  const step=state.step;
+
+  // ── DRAW BOUNDARY BOX (steps 2,3,4) ──
+  if(step>=2 && step<=4){
+    drawBoundaryBox(bp, step);
+  }
+
+  // ── DRAW RAW TRACED LINES (step 3 only) ──
+  if(step===3){
+    CURVES.forEach(c=>{
+      if(state.raw[c].length<2) return;
+      ctx.strokeStyle=COL[c];
+      ctx.lineWidth=2.5;
+      ctx.globalAlpha=0.7;
+      ctx.beginPath();
+      state.raw[c].forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+      ctx.stroke();
+      ctx.globalAlpha=1;
+    });
+  }
+
+  // ── DRAW CONTROL POINTS (steps 4,5) ──
+  if(step===4 || step===5){
+    CURVES.forEach(c=>{
+      if(state.ctrl[c].length===0) return;
+      const active=(step===4 && c===state.refineActive);
+      drawControlPoints(c, state.ctrl[c], active);
     });
 
-    // Draw calibration overlay grid if 4 points set
-    if (state.calibPoints.length === 4) drawGrid();
-
-    // Draw traced raw points
-    Object.keys(state.rawPoints).forEach(curve => {
-        const pts = state.rawPoints[curve];
-        if (pts.length === 0) return;
-        const color = COLORS[curve];
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.globalAlpha = 0.9;
-
-        ctx.beginPath();
-        pts.forEach((p, i) => {
-            const cx = p.x * state.canvasScale + state.offsetX;
-            const cy = p.y * state.canvasScale + state.offsetY;
-            if (i === 0) ctx.moveTo(cx, cy);
-            else ctx.lineTo(cx, cy);
-        });
-        ctx.stroke();
-
-        // Draw dots
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.7;
-        pts.forEach((p, i) => {
-            if (i % 3 === 0) { // Every 3rd point
-                const cx = p.x * state.canvasScale + state.offsetX;
-                const cy = p.y * state.canvasScale + state.offsetY;
-                ctx.beginPath();
-                ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        });
-        ctx.globalAlpha = 1;
+    // Draw connecting lines through ctrl points
+    CURVES.forEach(c=>{
+      if(state.ctrl[c].length<2) return;
+      ctx.strokeStyle=COL[c];
+      ctx.lineWidth=active?2.5:1.5;
+      ctx.setLineDash([4,3]);
+      ctx.globalAlpha=0.5;
+      ctx.beginPath();
+      state.ctrl[c].forEach((p,i)=>{ if(p) i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y); });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha=1;
     });
+  }
 }
 
-function drawCalibMarker(cx, cy, label, color) {
-    // Crosshair
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - 14, cy); ctx.lineTo(cx + 14, cy);
-    ctx.moveTo(cx, cy - 14); ctx.lineTo(cx, cy + 14);
-    ctx.stroke();
+function drawBoundaryBox(bp, step){
+  const W=cv.width, H=cv.height;
+  const sc=getAxisScale();
 
-    // Circle
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.3;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+  // Semi-transparent overlay outside box
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.fillRect(0,0,W,bp.t);
+  ctx.fillRect(0,bp.b,W,H-bp.b);
+  ctx.fillRect(0,bp.t,bp.l,bp.b-bp.t);
+  ctx.fillRect(bp.r,bp.t,W-bp.r,bp.b-bp.t);
 
-    // Label
-    ctx.fillStyle = '#000';
-    ctx.fillRect(cx + 8, cy - 20, label.length * 7 + 8, 18);
-    ctx.fillStyle = color;
-    ctx.font = 'bold 11px JetBrains Mono, monospace';
-    ctx.fillText(label, cx + 12, cy - 6);
-}
+  // Grid inside box (cyan lines)
+  ctx.strokeStyle='rgba(34,211,238,0.25)';
+  ctx.lineWidth=0.5;
+  ctx.setLineDash([4,4]);
+  for(let x=0;x<=10;x++){
+    const px=bp.l+x/10*(bp.r-bp.l);
+    ctx.beginPath();ctx.moveTo(px,bp.t);ctx.lineTo(px,bp.b);ctx.stroke();
+  }
+  for(let y=0;y<=4;y++){
+    const py=bp.t+y/4*(bp.b-bp.t);
+    ctx.beginPath();ctx.moveTo(bp.l,py);ctx.lineTo(bp.r,py);ctx.stroke();
+  }
+  ctx.setLineDash([]);
 
-function drawGrid() {
-    const cp = state.calibPoints;
-    const xMinPx = (cp[0].x * state.canvasScale + state.offsetX);
-    const xMaxPx = (cp[1].x * state.canvasScale + state.offsetX);
-    const yMaxPy = (cp[2].y * state.canvasScale + state.offsetY);
-    const yMinPy = (cp[3].y * state.canvasScale + state.offsetY);
+  // Axis labels
+  ctx.font='bold 10px JetBrains Mono,monospace';
 
-    const xMaxVal = parseFloat(document.getElementById('xMaxVal').value) || 100;
-    const yMaxVal = parseFloat(document.getElementById('yMaxVal').value) || 200;
+  // X axis ticks
+  for(let i=0;i<=5;i++){
+    const px=bp.l+i/5*(bp.r-bp.l);
+    const val=(sc.xMin+i/5*(sc.xMax-sc.xMin)).toFixed(0);
+    ctx.fillStyle='rgba(34,211,238,0.8)';
+    ctx.fillText(val+'%', px-8, bp.b+14);
+  }
 
-    ctx.strokeStyle = 'rgba(34,211,238,0.25)';
-    ctx.lineWidth = 0.5;
-    ctx.setLineDash([4, 4]);
+  // Left Y (torque) ticks
+  for(let i=0;i<=4;i++){
+    const py=bp.b-i/4*(bp.b-bp.t);
+    const val=(sc.lyMin+i/4*(sc.lyMax-sc.lyMin)).toFixed(0);
+    ctx.fillStyle='rgba(34,211,238,0.8)';
+    ctx.fillText(val+'%', bp.l-30, py+4);
+  }
 
-    // Vertical lines at 0,20,40,60,80,100% speed
-    for (let x = 0; x <= xMaxVal; x += 20) {
-        const px = xMinPx + (x / xMaxVal) * (xMaxPx - xMinPx);
-        ctx.beginPath(); ctx.moveTo(px, yMaxPy); ctx.lineTo(px, yMinPy); ctx.stroke();
-    }
+  // Right Y (current) ticks
+  for(let i=0;i<=4;i++){
+    const py=bp.b-i/4*(bp.b-bp.t);
+    const val=(sc.ryMin+i/4*(sc.ryMax-sc.ryMin)).toFixed(0);
+    ctx.fillStyle='rgba(251,191,36,0.8)';
+    ctx.fillText(val+'%', bp.r+4, py+4);
+  }
 
-    // Horizontal lines at 0, 50, 100, 150, 200%
-    for (let y = 0; y <= yMaxVal; y += 50) {
-        const py = yMinPy - (y / yMaxVal) * (yMinPy - yMaxPy);
-        ctx.beginPath(); ctx.moveTo(xMinPx, py); ctx.lineTo(xMaxPx, py); ctx.stroke();
-    }
+  // Box border
+  ctx.strokeStyle='#22d3ee';
+  ctx.lineWidth=2;
+  ctx.strokeRect(bp.l, bp.t, bp.r-bp.l, bp.b-bp.t);
 
-    ctx.setLineDash([]);
-
-    // Label grid
-    ctx.fillStyle = 'rgba(34,211,238,0.7)';
-    ctx.font = 'bold 10px JetBrains Mono, monospace';
-    for (let x = 0; x <= xMaxVal; x += 20) {
-        const px = xMinPx + (x / xMaxVal) * (xMaxPx - xMinPx);
-        ctx.fillText(x + '%', px - 10, yMinPy + 14);
-    }
-    for (let y = 0; y <= yMaxVal; y += 50) {
-        const py = yMinPy - (y / yMaxVal) * (yMinPy - yMaxPy);
-        ctx.fillText(y + '%', xMaxPx + 5, py + 4);
-    }
-}
-
-// ─────────────────────────────────────────────
-//  CALIBRATION CLICK HANDLING
-// ─────────────────────────────────────────────
-const CALIB_INSTRUCTIONS = [
-    'Click on X-axis MINIMUM (0% speed point)',
-    'Click on X-axis MAXIMUM (100% speed point)',
-    'Click on Y-axis MAXIMUM (highest value on Y)',
-    'Click on Y-axis MINIMUM (0% point on Y)',
-    '✅ Calibration complete! Proceed to Step 3'
-];
-
-function handleCalibClick(cx, cy) {
-    if (state.calibStep >= 4) return;
-    const imgP = canvasToImg(cx, cy);
-    state.calibPoints.push(imgP);
-    state.calibStep++;
-
-    const status = document.getElementById('calibStatus');
-    status.textContent = CALIB_INSTRUCTIONS[state.calibStep];
-
-    if (state.calibStep >= 4) {
-        status.classList.add('ready');
-        updatePill(2, 'done');
-        updatePill(3, 'active');
-        setTimeout(() => goToStep(3), 600);
-    }
-
-    redraw();
-}
-
-function resetCalibration() {
-    state.calibPoints = [];
-    state.calibStep = 0;
-    const status = document.getElementById('calibStatus');
-    status.textContent = CALIB_INSTRUCTIONS[0];
-    status.classList.remove('ready');
-    redraw();
-}
-
-// ─────────────────────────────────────────────
-//  TRACING
-// ─────────────────────────────────────────────
-function selectCurve(curve) {
-    state.activeCurve = curve;
-    document.querySelectorAll('.curve-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn' + curve.toUpperCase()).classList.add('active');
-}
-
-function addTracePoint(cx, cy) {
-    const imgP = canvasToImg(cx, cy);
-    state.rawPoints[state.activeCurve].push(imgP);
-    updateCurveCount(state.activeCurve);
-    redraw();
-}
-
-function undoLastPoint() {
-    const pts = state.rawPoints[state.activeCurve];
-    if (pts.length > 0) {
-        pts.pop();
-        updateCurveCount(state.activeCurve);
-        redraw();
-    }
-}
-
-function clearCurrentCurve() {
-    state.rawPoints[state.activeCurve] = [];
-    updateCurveCount(state.activeCurve);
-    redraw();
-}
-
-function updateCurveCount(curve) {
-    const count = state.rawPoints[curve].length;
-    document.getElementById('count' + curve.toUpperCase()).textContent = count + ' pts';
-}
-
-// ─────────────────────────────────────────────
-//  EXTRACTION: Raw points → 19 S_POINTS values
-// ─────────────────────────────────────────────
-function extractCurve(curve) {
-    const pts = state.rawPoints[curve];
-    if (pts.length < 2) return null;
-
-    // Convert to data coordinates, sort by X
-    const dataPts = pts
-        .map(p => imgToData(p.x, p.y))
-        .filter(d => d && d.x >= -5 && d.x <= 105 && d.y >= -10 && d.y <= 800)
-        .sort((a, b) => a.x - b.x);
-
-    if (dataPts.length < 2) return null;
-
-    // Sample at each of the 19 S_POINTS using linear interpolation
-    return S_POINTS.map(sp => {
-        // Find bracket
-        let lower = dataPts[0], upper = dataPts[dataPts.length - 1];
-        for (let i = 0; i < dataPts.length - 1; i++) {
-            if (dataPts[i].x <= sp && dataPts[i + 1].x >= sp) {
-                lower = dataPts[i];
-                upper = dataPts[i + 1];
-                break;
-            }
-        }
-        if (lower === upper) return Math.max(0, Math.round(lower.y));
-
-        const t = (upper.x - lower.x) === 0 ? 0 : (sp - lower.x) / (upper.x - lower.x);
-        const val = lower.y + t * (upper.y - lower.y);
-        return Math.max(0, Math.round(val));
+  // Corner & edge handles
+  if(step<=3){
+    const handles=getHandles(bp);
+    Object.entries(handles).forEach(([k,h])=>{
+      ctx.fillStyle='#22d3ee';
+      ctx.beginPath();ctx.arc(h.x,h.y,k.length>1?7:5,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.stroke();
     });
+  }
 }
 
-function extractAndPreview() {
-    const mt = extractCurve('mt');
-    const mc = extractCurve('mc');
-    const lt = extractCurve('lt');
+function getHandles(bp){
+  const mx=(bp.l+bp.r)/2, my=(bp.t+bp.b)/2;
+  return {
+    tl:{x:bp.l,y:bp.t}, tr:{x:bp.r,y:bp.t},
+    bl:{x:bp.l,y:bp.b}, br:{x:bp.r,y:bp.b},
+    t:{x:mx,y:bp.t},  b:{x:mx,y:bp.b},
+    l:{x:bp.l,y:my},  r:{x:bp.r,y:my}
+  };
+}
 
-    if (!mt && !mc && !lt) {
-        showToast('⚠️ No traced points found! Trace at least one curve.');
-        return;
+function drawControlPoints(curve, ctrls, isActive){
+  const col=COL[curve];
+  const r=isActive?9:6;
+
+  ctrls.forEach((p,i)=>{
+    if(!p) return;
+    const isHov=(state.hoveredCtrl && state.hoveredCtrl.curve===curve && state.hoveredCtrl.idx===i);
+
+    ctx.globalAlpha=isActive?0.95:0.6;
+    ctx.fillStyle=isHov?'#fff':col;
+    ctx.strokeStyle='#000';
+    ctx.lineWidth=isHov?2.5:1.5;
+    ctx.beginPath();ctx.arc(p.x,p.y,isHov?r+3:r,0,Math.PI*2);
+    ctx.fill();ctx.stroke();
+
+    if(isActive){
+      // Speed label
+      ctx.fillStyle='rgba(0,0,0,0.7)';
+      ctx.fillRect(p.x+10,p.y-14,28,16);
+      ctx.fillStyle=col;
+      ctx.font='bold 9px JetBrains Mono,monospace';
+      ctx.fillText(S_POINTS[i]+'%',p.x+12,p.y-2);
     }
 
-    state.extracted.mt = mt || [];
-    state.extracted.mc = mc || [];
-    state.extracted.lt = lt || [];
-
-    renderExtractedTable();
-    goToStep(4);
-    showToast('✅ Extraction complete! Review and apply.');
-}
-
-function renderExtractedTable() {
-    const mt = state.extracted.mt;
-    const mc = state.extracted.mc;
-    const lt = state.extracted.lt;
-
-    let html = `<table>
-        <thead><tr>
-            <th>Speed</th>
-            <th style="color:var(--accent)">Motor T%</th>
-            <th style="color:var(--yellow)">Motor I%</th>
-            <th style="color:var(--red)">Load T%</th>
-        </tr></thead><tbody>`;
-
-    S_POINTS.forEach((sp, i) => {
-        const mtv = mt[i] !== undefined ? mt[i] : null;
-        const mcv = mc[i] !== undefined ? mc[i] : null;
-        const ltv = lt[i] !== undefined ? lt[i] : null;
-
-        html += `<tr>
-            <td>${sp}%</td>
-            <td class="${mtv !== null ? 'mt' : 'empty'}">${mtv !== null ? mtv : '–'}</td>
-            <td class="${mcv !== null ? 'mc' : 'empty'}">${mcv !== null ? mcv : '–'}</td>
-            <td class="${ltv !== null ? 'lt' : 'empty'}">${ltv !== null ? ltv : '–'}</td>
-        </tr>`;
-    });
-
-    html += '</tbody></table>';
-    document.getElementById('extractedTable').innerHTML = html;
-}
-
-// ─────────────────────────────────────────────
-//  APPLY TO SIMULATOR
-// ─────────────────────────────────────────────
-function applyToSimulator() {
-    const data = {
-        mt: state.extracted.mt,
-        mc: state.extracted.mc,
-        lt: state.extracted.lt
-    };
-
-    localStorage.setItem('digitizerData', JSON.stringify(data));
-    showToast('✅ Data saved! Returning to simulator...');
-    setTimeout(() => { window.location.href = 'index.html'; }, 800);
-}
-
-function goBack() {
-    window.location.href = 'index.html';
-}
-
-// ─────────────────────────────────────────────
-//  STEP NAVIGATION
-// ─────────────────────────────────────────────
-function goToStep(n) {
-    state.step = n;
-    ['step1Panel', 'step2Panel', 'step3Panel', 'step4Panel'].forEach((id, i) => {
-        document.getElementById(id).style.display = (i + 1 === n) ? 'block' : 'none';
-    });
-}
-
-function updatePill(n, status) {
-    const pill = document.getElementById('pill' + n);
-    pill.classList.remove('active', 'done');
-    if (status) pill.classList.add(status);
-}
-
-// ─────────────────────────────────────────────
-//  CANVAS EVENT HANDLING (Mouse + Touch)
-// ─────────────────────────────────────────────
-function getCanvasPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    if (e.touches) {
-        return {
-            x: e.touches[0].clientX - rect.left,
-            y: e.touches[0].clientY - rect.top
-        };
+    if(isHov && state.step===4){
+      // Value tooltip
+      const useRight=isRightAxis(curve);
+      const d=canvasToData(p.x,p.y,useRight);
+      const label=Math.max(0,Math.round(d.y))+'%';
+      const tw=ctx.measureText(label).width+12;
+      ctx.fillStyle='rgba(0,0,0,0.85)';
+      ctx.fillRect(p.x-tw/2,p.y-36,tw,20);
+      ctx.fillStyle='#fff';
+      ctx.font='bold 11px JetBrains Mono,monospace';
+      ctx.textAlign='center';
+      ctx.fillText(label,p.x,p.y-21);
+      ctx.textAlign='left';
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    ctx.globalAlpha=1;
+  });
 }
 
-canvas.addEventListener('mousedown', e => {
-    if (!state.image) return;
-    const pos = getCanvasPos(e);
-
-    if (state.step === 2) {
-        handleCalibClick(pos.x, pos.y);
-    } else if (state.step === 3) {
-        state.isDrawing = true;
-        addTracePoint(pos.x, pos.y);
-    }
-});
-
-canvas.addEventListener('mousemove', e => {
-    if (!state.isDrawing || state.step !== 3) return;
-    const pos = getCanvasPos(e);
-    const last = state.rawPoints[state.activeCurve];
-    if (last.length > 0) {
-        const prevImg = last[last.length - 1];
-        const prevCx = prevImg.x * state.canvasScale + state.offsetX;
-        const prevCy = prevImg.y * state.canvasScale + state.offsetY;
-        const dist = Math.hypot(pos.x - prevCx, pos.y - prevCy);
-        if (dist > 8) addTracePoint(pos.x, pos.y); // Sample every 8px of movement
-    }
-});
-
-canvas.addEventListener('mouseup', () => { state.isDrawing = false; });
-canvas.addEventListener('mouseleave', () => { state.isDrawing = false; });
-
-canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
-    if (!state.image) return;
-    const pos = getCanvasPos(e);
-    if (state.step === 2) {
-        handleCalibClick(pos.x, pos.y);
-    } else if (state.step === 3) {
-        state.isDrawing = true;
-        addTracePoint(pos.x, pos.y);
-    }
-}, { passive: false });
-
-canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (!state.isDrawing || state.step !== 3) return;
-    const pos = getCanvasPos(e);
-    const last = state.rawPoints[state.activeCurve];
-    if (last.length > 0) {
-        const prevImg = last[last.length - 1];
-        const prevCx = prevImg.x * state.canvasScale + state.offsetX;
-        const prevCy = prevImg.y * state.canvasScale + state.offsetY;
-        const dist = Math.hypot(pos.x - prevCx, pos.y - prevCy);
-        if (dist > 6) addTracePoint(pos.x, pos.y);
-    }
-}, { passive: false });
-
-canvas.addEventListener('touchend', e => {
-    e.preventDefault();
-    state.isDrawing = false;
-}, { passive: false });
-
-// ─────────────────────────────────────────────
-//  RESIZE
-// ─────────────────────────────────────────────
-window.addEventListener('resize', () => {
-    if (state.image) fitAndDrawImage();
-});
-
-// ─────────────────────────────────────────────
-//  TOAST
-// ─────────────────────────────────────────────
-let toastTimer;
-function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+// ═══════════════════════════════════════════════
+// POINTER EVENTS (unified mouse + touch)
+// ═══════════════════════════════════════════════
+function getPos(e){
+  const rect=cv.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  return {x:src.clientX-rect.left, y:src.clientY-rect.top};
 }
+
+function hitHandle(pos, bp){
+  const handles=getHandles(bp);
+  let best=null, bestD=14;
+  Object.entries(handles).forEach(([k,h])=>{
+    const d=Math.hypot(pos.x-h.x,pos.y-h.y);
+    if(d<bestD){bestD=d;best=k;}
+  });
+  return best;
+}
+
+function hitCtrl(pos, curve){
+  const pts=state.ctrl[curve];
+  for(let i=pts.length-1;i>=0;i--){
+    if(!pts[i]) continue;
+    if(Math.hypot(pos.x-pts[i].x,pos.y-pts[i].y)<14) return i;
+  }
+  return -1;
+}
+
+cv.addEventListener('mousedown',  pointerDown);
+cv.addEventListener('touchstart', pointerDown, {passive:false});
+cv.addEventListener('mousemove',  pointerMove);
+cv.addEventListener('touchmove',  pointerMove, {passive:false});
+cv.addEventListener('mouseup',    pointerUp);
+cv.addEventListener('touchend',   pointerUp,   {passive:false});
+
+function pointerDown(e){
+  if(e.cancelable) e.preventDefault();
+  if(!state.img) return;
+  const pos=getPos(e);
+  const bp=getBoxPx();
+
+  if(state.step===2 || state.step===3){
+    // Check box handle hit
+    const h=hitHandle(pos,bp);
+    if(h){ state.dragBox=h; return; }
+    // Inside box drag to move it
+    if(pos.x>bp.l&&pos.x<bp.r&&pos.y>bp.t&&pos.y<bp.b){
+      state.dragBox='move';
+      state._dragStart={...pos, bl:box.l, bt:box.t, br:box.r, bb:box.b};
+      return;
+    }
+    state.dragBox=null;
+  }
+
+  if(state.step===3){
+    // Start tracing
+    state.drawing=true;
+    state.raw[state.activeCurve].push({...pos});
+    updateCounts();
+    redraw();
+  }
+
+  if(state.step===4){
+    // Hit control point?
+    const active=state.refineActive;
+    const idx=hitCtrl(pos,active);
+    if(idx>=0){ state.dragCtrl={curve:active,idx}; return; }
+    state.dragCtrl=null;
+  }
+}
+
+let lastSample={x:0,y:0};
+function pointerMove(e){
+  if(e.cancelable) e.preventDefault();
+  if(!state.img) return;
+  const pos=getPos(e);
+  const W=cv.width, H=cv.height;
+  const bp=getBoxPx();
+
+  // BOX DRAG
+  if(state.dragBox){
+    const k=state.dragBox;
+    const pad=20;
+    if(k==='move'){
+      const dx=(pos.x-state._dragStart.x)/W;
+      const dy=(pos.y-state._dragStart.y)/H;
+      const w=state._dragStart.br-state._dragStart.bl;
+      const h=state._dragStart.bb-state._dragStart.bt;
+      box.l=Math.max(0.01,Math.min(state._dragStart.bl+dx,0.98-w));
+      box.r=box.l+w;
+      box.t=Math.max(0.01,Math.min(state._dragStart.bt+dy,0.98-h));
+      box.b=box.t+h;
+    } else {
+      if(k.includes('l')) box.l=Math.min(pos.x/W, box.r-pad/W);
+      if(k.includes('r')) box.r=Math.max(pos.x/W, box.l+pad/W);
+      if(k.includes('t')) box.t=Math.min(pos.y/H, box.b-pad/H);
+      if(k.includes('b')) box.b=Math.max(pos.y/H, box.t+pad/H);
+      if(k==='l') box.l=Math.min(pos.x/W,box.r-pad/W);
+      if(k==='r') box.r=Math.max(pos.x/W,box.l+pad/W);
+      if(k==='t') box.t=Math.min(pos.y/H,box.b-pad/H);
+      if(k==='b') box.b=Math.max(pos.y/H,box.t+pad/H);
+    }
+    redraw();
+    return;
+  }
+
+  // TRACING
+  if(state.drawing && state.step===3){
+    const d=Math.hypot(pos.x-lastSample.x,pos.y-lastSample.y);
+    if(d>7){
+      state.raw[state.activeCurve].push({...pos});
+      lastSample={...pos};
+      updateCounts();
+      redraw();
+    }
+    return;
+  }
+
+  // CONTROL POINT DRAG
+  if(state.dragCtrl && state.step===4){
+    const {curve,idx}=state.dragCtrl;
+    state.ctrl[curve][idx]={x:pos.x,y:pos.y};
+    redraw();
+    return;
+  }
+
+  // HOVER detection for ctrl points (step 4)
+  if(state.step===4){
+    const active=state.refineActive;
+    const idx=hitCtrl(pos,active);
+    const prev=state.hoveredCtrl;
+    state.hoveredCtrl = idx>=0 ? {curve:active,idx} : null;
+    if(JSON.stringify(prev)!==JSON.stringify(state.hoveredCtrl)) redraw();
+    cv.style.cursor=idx>=0?'grab':'crosshair';
+  }
+}
+
+function pointerUp(e){
+  if(e && e.cancelable) e.preventDefault();
+  state.drawing=false;
+  state.dragBox=null;
+  if(state.dragCtrl){ state.dragCtrl=null; renderExtracted(); }
+}
+
+// ═══════════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════════
+window.addEventListener('resize',()=>{ if(state.img) fitCanvas(); });
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+let _tt;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// Wire step 5 button
+document.querySelector('#s4 .abtn-go').onclick = ()=>{
+  renderExtracted(); goStep(5);
+};
 </script>
 </body>
 </html>
