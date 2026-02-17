@@ -64,6 +64,23 @@ h1 {
     gap: 15px;
 }
 
+.btn-digitize {
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid #a855f7;
+    color: #a855f7;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: all 0.2s;
+}
+
+.btn-digitize:hover {
+    background: rgba(168, 85, 247, 0.2);
+    transform: translateY(-1px);
+}
+
 .btn-notes {
     background: rgba(34, 211, 238, 0.1);
     border: 1px solid var(--accent);

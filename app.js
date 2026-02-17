@@ -125,6 +125,26 @@ function init() {
             <td><input type="number" class="val-lt" value="${PRESETS.load.oem[i]}"></td></tr>`;
     });
 
+    // Check if returning from digitizer with data
+    const digitizerData = localStorage.getItem('digitizerData');
+    if (digitizerData) {
+        try {
+            const data = JSON.parse(digitizerData);
+            const mts = document.querySelectorAll('.val-mt');
+            const mcs = document.querySelectorAll('.val-mc');
+            const lts = document.querySelectorAll('.val-lt');
+            let applied = 0;
+            if (data.mt && data.mt.length === 19) { data.mt.forEach((v, i) => mts[i].value = v); applied++; }
+            if (data.mc && data.mc.length === 19) { data.mc.forEach((v, i) => mcs[i].value = v); applied++; }
+            if (data.lt && data.lt.length === 19) { data.lt.forEach((v, i) => lts[i].value = v); applied++; }
+            localStorage.removeItem('digitizerData');
+            if (applied > 0) {
+                window.splineCache = {};
+                showImportBanner(applied);
+            }
+        } catch(e) { localStorage.removeItem('digitizerData'); }
+    }
+
     document.getElementById('motorPreset').onchange = (e) => applyPreset('motor', e.target.value);
     document.getElementById('loadPreset').onchange = (e) => applyPreset('load', e.target.value);
     document.getElementById('btnSimulate').onclick = runSimulation;
@@ -352,10 +372,19 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
                 lastSpeedValue = speedPerc;
             }
             
-            // 5. EXCESSIVE TIME (taking too long, likely stuck)
-            if (time > 45 && speedPerc < 80) {
+            // 5. CREEPING (very slow progress, insufficient current)
+            if (time > 20 && speedPerc < 50) {
                 isStalled = true;
-                stallReason = "Timeout (Excessive Start Time)";
+                stallReason = "Too Slow (Creeping - Insufficient Current)";
+                stallSpd = speedPerc;
+                break;
+            }
+            
+            // 6. EXCESSIVE TIME (max 30s OR 2× hot stall, whichever is less)
+            const maxAllowedTime = Math.min(30, hStall * 2);
+            if (time > maxAllowedTime) {
+                isStalled = true;
+                stallReason = `Timeout (>${maxAllowedTime.toFixed(0)}s)`;
                 stallSpd = speedPerc;
                 break;
             }
@@ -406,11 +435,16 @@ function runSimulation() {
     let minStartResult = { current: 0, criticalSpeed: 0 };
     if (simulationMode === 'SS') {
         minStartResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
-        const userCurrent = Math.max(ssInitialI, ssFinalI);
         
-        // Warn if below minimum, but let simulation run to show stall
-        if (userCurrent < minStartResult.current) {
-            alert(`⚠️ WARNING: Current below minimum!\n\nYour: ${userCurrent}%\nMinimum: ${minStartResult.current}%\n\nMotor will likely STALL at ~${minStartResult.criticalSpeed}% speed.`);
+        // Check if initial current is below minimum (will struggle during ramp)
+        if (ssInitialI < minStartResult.current) {
+            alert(`⚠️ RAMP WARNING\n\nInitial: ${ssInitialI}%\nMinimum: ${minStartResult.current}%\n\nMotor will struggle during ramp phase!\nConsider increasing initial current.`);
+        }
+        
+        // Check if final current is below minimum (will stall)
+        const userFinalCurrent = Math.max(ssInitialI, ssFinalI);
+        if (userFinalCurrent < minStartResult.current) {
+            alert(`⚠️ INSUFFICIENT CURRENT\n\nYour: ${userFinalCurrent}%\nMinimum: ${minStartResult.current}%\n\nMotor will STALL at ~${minStartResult.criticalSpeed}% speed.`);
         }
     }
 
@@ -600,21 +634,63 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
 
 function solveForCurrentFromTime(targetTime) {
     const ssRampTime = parseFloat(document.getElementById('ssRampTime')?.value) || 0;
-    let low = 200, high = 700, iterations = 0, bestCurrent = 0;
+    let low = 200, high = 700, iterations = 0;
+    let bestCurrent = 0, bestTime = 999;
     
-    while (high - low > 2 && iterations < 20) {
+    // Binary search for current that gives target time
+    while (high - low > 5 && iterations < 25) {
         let mid = Math.floor((low + high) / 2);
         let result = runSimulationCore('SS', mid, mid, ssRampTime, true);
-        if (result.isStalled || result.time > targetTime) low = mid;
-        else { high = mid; bestCurrent = mid; }
+        
+        console.log(`Iteration ${iterations}: Testing ${mid}% → ${result.time.toFixed(1)}s (target: ${targetTime}s, stalled: ${result.isStalled})`);
+        
+        if (result.isStalled) {
+            // Stalled - need MORE current
+            low = mid + 1;
+        } else if (result.time > targetTime) {
+            // Too slow - need MORE current
+            low = mid + 1;
+        } else {
+            // Fast enough - try LESS current, but save this as best
+            high = mid - 1;
+            if (result.time < bestTime || bestCurrent === 0) {
+                bestCurrent = mid;
+                bestTime = result.time;
+            }
+        }
         iterations++;
     }
     
-    if (bestCurrent > 0) {
-        document.getElementById('ssInitialI').value = bestCurrent;
-        document.getElementById('ssFinalI').value = bestCurrent;
-        runSimulation();
+    // If no solution found, try the minimum starting current
+    if (bestCurrent === 0) {
+        const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);
+        const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
+        const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
+        const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
+        bestCurrent = minResult.current;
+        alert(`⚠️ Could not find current for ${targetTime}s.\n\nUsing minimum starting current: ${bestCurrent}%`);
+    } else {
+        console.log(`✓ Found: ${bestCurrent}% gives ${bestTime.toFixed(2)}s`);
     }
+    
+    document.getElementById('ssInitialI').value = bestCurrent;
+    document.getElementById('ssFinalI').value = bestCurrent;
+    runSimulation();
+}
+
+function showImportBanner(count) {
+    const curveNames = ['Motor Torque', 'Motor Current', 'Load Torque'];
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        position:fixed; top:80px; left:50%; transform:translateX(-50%);
+        background:#0a0c10; border:2px solid var(--success); color:var(--success);
+        padding:14px 28px; border-radius:10px; font-size:0.95rem; font-weight:700;
+        z-index:999; font-family:'JetBrains Mono',monospace;
+        box-shadow:0 4px 30px rgba(16,185,129,0.3);
+    `;
+    banner.innerHTML = `✅ Digitizer imported ${count} curve${count > 1 ? 's' : ''}! Run simulation to see results.`;
+    document.body.appendChild(banner);
+    setTimeout(() => banner.remove(), 4000);
 }
 
 function exportToPDF() {

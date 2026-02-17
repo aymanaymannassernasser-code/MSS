@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Curve Digitizer | Motor Starter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10;
+            --panel: #111318;
+            --border: #1e2535;
+            --accent: #22d3ee;
+            --green: #10b981;
+            --yellow: #fbbf24;
+            --red: #f43f5e;
+            --purple: #a855f7;
+            --text: #e2e8f0;
+            --muted: #64748b;
+            --step-inactive: #1e2535;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            overflow: hidden;
+        }
+
+        /* ─── HEADER ─── */
+        header {
+            background: #000;
+            border-bottom: 2px solid var(--accent);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        header .title { font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
+        header .subtitle { font-size: 0.8rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+        .btn-back {
+            background: none; border: 1px solid var(--border); color: var(--muted);
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-family: 'Rajdhani';
+            font-size: 0.9rem; font-weight: 600; transition: all 0.2s;
+        }
+        .btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ─── MAIN LAYOUT ─── */
+        .main { display: grid; grid-template-columns: 340px 1fr; height: 100%; overflow: hidden; }
+
+        /* ─── SIDEBAR ─── */
+        .sidebar {
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* ─── STEP PILLS ─── */
+        .steps { display: flex; gap: 6px; }
+        .step-pill {
+            flex: 1; text-align: center; padding: 8px 4px;
+            border: 1px solid var(--step-inactive); border-radius: 6px;
+            font-size: 0.7rem; font-weight: 700; letter-spacing: 0.5px;
+            color: var(--muted); background: transparent; cursor: default;
+            transition: all 0.3s; text-transform: uppercase;
+        }
+        .step-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(34,211,238,0.08); }
+        .step-pill.done { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
+
+        /* ─── SECTION ─── */
+        .section-title {
+            font-size: 0.7rem; font-weight: 700; letter-spacing: 1px;
+            text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+        }
+
+        /* ─── UPLOAD ─── */
+        .upload-zone {
+            border: 2px dashed var(--border); border-radius: 10px;
+            padding: 28px; text-align: center; cursor: pointer;
+            transition: all 0.2s; background: rgba(34,211,238,0.02);
+        }
+        .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(34,211,238,0.06); }
+        .upload-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .upload-zone .text { font-size: 0.9rem; color: var(--muted); }
+        .upload-zone .subtext { font-size: 0.75rem; color: #334155; margin-top: 6px; }
+        #fileInput { display: none; }
+
+        /* ─── CALIBRATION ─── */
+        .calib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .calib-field label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; font-weight: 700; letter-spacing: 0.3px; }
+        .calib-field input {
+            width: 100%; background: #0a0c10; border: 1px solid var(--border);
+            color: #fff; padding: 8px 10px; border-radius: 6px;
+            font-size: 0.85rem; font-family: 'JetBrains Mono', monospace;
+        }
+        .calib-field input:focus { border-color: var(--accent); outline: none; }
+        .calib-status {
+            padding: 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+            margin-top: 10px; text-align: center; background: rgba(34,211,238,0.05);
+            border: 1px solid var(--border); color: var(--muted);
+        }
+        .calib-status.ready { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
+
+        /* ─── CURVE SELECTOR ─── */
+        .curve-btns { display: flex; flex-direction: column; gap: 8px; }
+        .curve-btn {
+            padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); cursor: pointer;
+            display: flex; align-items: center; gap: 12px;
+            font-family: 'Rajdhani'; font-size: 0.9rem; font-weight: 600;
+            transition: all 0.2s; text-align: left;
+        }
+        .curve-btn .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .curve-btn .count { margin-left: auto; font-size: 0.7rem; font-family: 'JetBrains Mono'; }
+        .curve-btn:hover { border-color: #2d3748; color: #fff; }
+        .curve-btn.active { color: #fff; }
+        .curve-btn.mt.active  { border-color: var(--accent); background: rgba(34,211,238,0.08); }
+        .curve-btn.mc.active  { border-color: var(--yellow); background: rgba(251,191,36,0.08); }
+        .curve-btn.lt.active  { border-color: var(--red); background: rgba(244,63,94,0.08); }
+
+        /* ─── TRACE CONTROLS ─── */
+        .trace-controls { display: flex; flex-direction: column; gap: 10px; }
+        .btn-action {
+            padding: 12px; border: none; border-radius: 8px;
+            font-family: 'Rajdhani'; font-size: 0.9rem; font-weight: 700;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-undo { background: rgba(244,63,94,0.1); border: 1px solid var(--red); color: var(--red); }
+        .btn-undo:hover { background: rgba(244,63,94,0.2); }
+        .btn-clear { background: rgba(100,116,139,0.1); border: 1px solid #334155; color: var(--muted); }
+        .btn-clear:hover { background: rgba(100,116,139,0.2); color: #fff; }
+        .btn-extract { background: var(--green); color: #000; font-size: 0.95rem; }
+        .btn-extract:hover { background: #059669; }
+        .btn-apply { background: var(--accent); color: #000; font-size: 1rem; font-weight: 800; }
+        .btn-apply:hover { background: #06b6d4; }
+        .btn-apply:disabled { background: #1e2535; color: var(--muted); cursor: not-allowed; }
+
+        /* ─── EXTRACTED TABLE ─── */
+        .extracted-table {
+            max-height: 200px; overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+        }
+        .extracted-table table { width: 100%; border-collapse: collapse; }
+        .extracted-table th {
+            padding: 6px 8px; background: #0a0c10; color: var(--muted);
+            font-size: 0.65rem; text-transform: uppercase; position: sticky; top: 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .extracted-table td { padding: 5px 8px; border-bottom: 1px solid #0f1219; text-align: right; }
+        .extracted-table td:first-child { color: var(--muted); text-align: left; }
+        .extracted-table td.mt { color: var(--accent); }
+        .extracted-table td.mc { color: var(--yellow); }
+        .extracted-table td.lt { color: var(--red); }
+        .extracted-table td.empty { color: #1e2535; }
+
+        /* ─── CANVAS AREA ─── */
+        .canvas-area {
+            position: relative; overflow: hidden; background: #000;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #mainCanvas {
+            position: absolute; top: 0; left: 0;
+            touch-action: none; cursor: crosshair;
+            max-width: 100%; max-height: 100%;
+        }
+        .canvas-placeholder {
+            text-align: center; color: #1e2535; pointer-events: none;
+        }
+        .canvas-placeholder .big { font-size: 5rem; margin-bottom: 20px; }
+        .canvas-placeholder .msg { font-size: 1.1rem; font-weight: 600; }
+
+        /* ─── TOAST ─── */
+        .toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: #111318; border: 1px solid var(--accent); color: var(--accent);
+            padding: 12px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+            transition: transform 0.3s ease; z-index: 999; white-space: nowrap;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* ─── MOBILE ─── */
+        @media (max-width: 768px) {
+            body { grid-template-rows: auto auto 1fr; overflow: auto; height: auto; }
+            .main { grid-template-columns: 1fr; height: auto; }
+            .sidebar { overflow-y: visible; }
+            .canvas-area { height: 60vw; min-height: 300px; }
+            #mainCanvas { position: relative; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <div class="title">📐 Curve Digitizer</div>
+        <div class="subtitle">Transform datasheets into physics data in 30 seconds</div>
+    </div>
+    <button class="btn-back" onclick="goBack()">← Back to Simulator</button>
+</header>
+
+<div class="main">
+    <!-- ─── SIDEBAR ─── -->
+    <aside class="sidebar">
+
+        <!-- STEP PILLS -->
+        <div class="steps">
+            <div class="step-pill active" id="pill1">1 Upload</div>
+            <div class="step-pill" id="pill2">2 Calibrate</div>
+            <div class="step-pill" id="pill3">3 Trace</div>
+            <div class="step-pill" id="pill4">4 Apply</div>
+        </div>
+
+        <!-- STEP 1: UPLOAD -->
+        <div id="step1Panel">
+            <div class="section-title">📷 Upload Datasheet</div>
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div class="icon">🗂️</div>
+                <div class="text">Tap to upload photo</div>
+                <div class="subtext">JPG, PNG, PDF screenshot<br>Camera or gallery works!</div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+
+        <!-- STEP 2: CALIBRATE -->
+        <div id="step2Panel" style="display:none">
+            <div class="section-title">📏 Axis Calibration</div>
+            <p style="font-size:0.8rem; color:var(--muted); margin-bottom:14px; line-height:1.5;">
+                Enter the axis limits, then <strong style="color:#fff">click 4 calibration points</strong> on the chart:
+            </p>
+            <div style="background:rgba(34,211,238,0.05); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.8rem; line-height:1.8; color:var(--muted);">
+                <span style="color:var(--accent)">①</span> X-axis MIN (0% speed)<br>
+                <span style="color:var(--accent)">②</span> X-axis MAX (100% speed)<br>
+                <span style="color:var(--accent)">③</span> Y-axis MIN (0%)<br>
+                <span style="color:var(--accent)">④</span> Y-axis MAX (e.g. 200%)
+            </div>
+            <div class="calib-grid">
+                <div class="calib-field">
+                    <label>X Min (speed%)</label>
+                    <input type="number" id="xMinVal" value="0">
+                </div>
+                <div class="calib-field">
+                    <label>X Max (speed%)</label>
+                    <input type="number" id="xMaxVal" value="100">
+                </div>
+                <div class="calib-field">
+                    <label>Y Min (%)</label>
+                    <input type="number" id="yMinVal" value="0">
+                </div>
+                <div class="calib-field">
+                    <label>Y Max (%)</label>
+                    <input type="number" id="yMaxVal" value="200">
+                </div>
+            </div>
+            <div class="calib-status" id="calibStatus">
+                Click 4 calibration points on the chart image
+            </div>
+            <button class="btn-action" style="margin-top:12px; background:rgba(34,211,238,0.1); border:1px solid var(--accent); color:var(--accent); font-family:Rajdhani; font-size:0.9rem; font-weight:700; padding:10px; border-radius:8px; cursor:pointer; text-transform:uppercase; width:100%;"
+                onclick="resetCalibration()">↺ Reset Points</button>
+        </div>
+
+        <!-- STEP 3: TRACE -->
+        <div id="step3Panel" style="display:none">
+            <div class="section-title">✏️ Trace Curves</div>
+            <p style="font-size:0.8rem; color:var(--muted); margin-bottom:12px; line-height:1.5;">
+                Select a curve, then <strong style="color:#fff">drag your finger</strong> along it on the chart.
+            </p>
+            <div class="curve-btns">
+                <button class="curve-btn mt active" id="btnMT" onclick="selectCurve('mt')">
+                    <span class="dot" style="background:var(--accent)"></span>
+                    Motor Torque (%)
+                    <span class="count" id="countMT">0 pts</span>
+                </button>
+                <button class="curve-btn mc" id="btnMC" onclick="selectCurve('mc')">
+                    <span class="dot" style="background:var(--yellow)"></span>
+                    Motor Current (%)
+                    <span class="count" id="countMC">0 pts</span>
+                </button>
+                <button class="curve-btn lt" id="btnLT" onclick="selectCurve('lt')">
+                    <span class="dot" style="background:var(--red)"></span>
+                    Load Torque (%)
+                    <span class="count" id="countLT">0 pts</span>
+                </button>
+            </div>
+            <div class="trace-controls" style="margin-top:14px;">
+                <button class="btn-action btn-undo" onclick="undoLastPoint()">↩ Undo Last Point</button>
+                <button class="btn-action btn-clear" onclick="clearCurrentCurve()">✕ Clear This Curve</button>
+                <button class="btn-action btn-extract" onclick="extractAndPreview()">⚡ Extract & Preview</button>
+            </div>
+        </div>
+
+        <!-- STEP 4: APPLY -->
+        <div id="step4Panel" style="display:none">
+            <div class="section-title">📊 Extracted Values</div>
+            <div class="extracted-table" id="extractedTable"></div>
+            <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px;">
+                <button class="btn-action btn-clear" onclick="goToStep(3)">← Back to Trace</button>
+                <button class="btn-action btn-apply" id="btnApply" onclick="applyToSimulator()">
+                    ✅ Apply to Simulator
+                </button>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ─── CANVAS AREA ─── -->
+    <div class="canvas-area" id="canvasArea">
+        <div class="canvas-placeholder" id="placeholder">
+            <div class="big">📊</div>
+            <div class="msg">Upload a datasheet image to begin</div>
+        </div>
+        <canvas id="mainCanvas"></canvas>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const S_POINTS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100];
+const COLORS = { mt: '#22d3ee', mc: '#fbbf24', lt: '#f43f5e' };
+const CURVE_LABELS = { mt: 'Motor Torque', mc: 'Motor Current', lt: 'Load Torque' };
+
+let state = {
+    step: 1,
+    image: null,
+    imageW: 0, imageH: 0,
+    // Calibration: pixel coordinates of 4 clicked points
+    calibPoints: [],      // [{px, py}, ...] up to 4
+    calibStep: 0,         // 0=none,1=xmin,2=xmax,3=ymin,4=ymax done
+    // Raw traced points per curve (pixel coords)
+    rawPoints: { mt: [], mc: [], lt: [] },
+    // Extracted values at S_POINTS
+    extracted: { mt: [], mc: [], lt: [] },
+    activeCurve: 'mt',
+    isDrawing: false,
+    canvasScale: 1,       // image scale factor on canvas
+    offsetX: 0, offsetY: 0 // image offset on canvas
+};
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+
+// ─────────────────────────────────────────────
+//  FILE UPLOAD
+// ─────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) loadImage(file);
+});
+
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); uploadZone.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadImage(file);
+});
+
+function loadImage(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            state.image = img;
+            state.imageW = img.width;
+            state.imageH = img.height;
+            document.getElementById('placeholder').style.display = 'none';
+            fitAndDrawImage();
+            goToStep(2);
+            showToast('Image loaded! Now set calibration points.');
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function fitAndDrawImage() {
+    const area = document.getElementById('canvasArea');
+    const W = area.clientWidth, H = area.clientHeight;
+    canvas.width = W; canvas.height = H;
+
+    const scaleX = W / state.imageW;
+    const scaleY = H / state.imageH;
+    state.canvasScale = Math.min(scaleX, scaleY);
+    state.offsetX = (W - state.imageW * state.canvasScale) / 2;
+    state.offsetY = (H - state.imageH * state.canvasScale) / 2;
+
+    redraw();
+}
+
+// ─────────────────────────────────────────────
+//  COORDINATE TRANSFORMS
+// ─────────────────────────────────────────────
+// Canvas pixel → image pixel
+function canvasToImg(cx, cy) {
+    return {
+        x: (cx - state.offsetX) / state.canvasScale,
+        y: (cy - state.offsetY) / state.canvasScale
+    };
+}
+
+// Image pixel → data coordinates (using 4 calibration points)
+// calib[0]=xMin, calib[1]=xMax, calib[2]=yMin, calib[3]=yMax
+function imgToData(ix, iy) {
+    const cp = state.calibPoints;
+    if (cp.length < 4) return null;
+
+    const xMinPx = cp[0].x, xMaxPx = cp[1].x;
+    const yMinPy = cp[3].y, yMaxPy = cp[2].y;   // Note: yMin is LOWER on image (higher pixel Y)
+
+    const xMinVal = parseFloat(document.getElementById('xMinVal').value) || 0;
+    const xMaxVal = parseFloat(document.getElementById('xMaxVal').value) || 100;
+    const yMinVal = parseFloat(document.getElementById('yMinVal').value) || 0;
+    const yMaxVal = parseFloat(document.getElementById('yMaxVal').value) || 200;
+
+    const dataX = xMinVal + (ix - xMinPx) / (xMaxPx - xMinPx) * (xMaxVal - xMinVal);
+    // Y axis: image Y increases downward, data Y increases upward
+    const dataY = yMinVal + (iy - yMinPy) / (yMaxPy - yMinPy) * (yMaxVal - yMinVal);
+
+    return { x: dataX, y: dataY };
+}
+
+// Canvas pixel → data coordinate
+function canvasToData(cx, cy) {
+    const img = canvasToImg(cx, cy);
+    return imgToData(img.x, img.y);
+}
+
+// ─────────────────────────────────────────────
+//  DRAWING
+// ─────────────────────────────────────────────
+function redraw() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw image
+    if (state.image) {
+        ctx.drawImage(state.image,
+            state.offsetX, state.offsetY,
+            state.imageW * state.canvasScale,
+            state.imageH * state.canvasScale);
+    }
+
+    // Draw calibration points
+    const calibColors = ['#22d3ee', '#22d3ee', '#f43f5e', '#f43f5e'];
+    const calibLabels = ['X-Min', 'X-Max', 'Y-Max', 'Y-Min'];
+    state.calibPoints.forEach((p, i) => {
+        const cx = p.x * state.canvasScale + state.offsetX;
+        const cy = p.y * state.canvasScale + state.offsetY;
+        drawCalibMarker(cx, cy, calibLabels[i], calibColors[i]);
+    });
+
+    // Draw calibration overlay grid if 4 points set
+    if (state.calibPoints.length === 4) drawGrid();
+
+    // Draw traced raw points
+    Object.keys(state.rawPoints).forEach(curve => {
+        const pts = state.rawPoints[curve];
+        if (pts.length === 0) return;
+        const color = COLORS[curve];
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = 0.9;
+
+        ctx.beginPath();
+        pts.forEach((p, i) => {
+            const cx = p.x * state.canvasScale + state.offsetX;
+            const cy = p.y * state.canvasScale + state.offsetY;
+            if (i === 0) ctx.moveTo(cx, cy);
+            else ctx.lineTo(cx, cy);
+        });
+        ctx.stroke();
+
+        // Draw dots
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.7;
+        pts.forEach((p, i) => {
+            if (i % 3 === 0) { // Every 3rd point
+                const cx = p.x * state.canvasScale + state.offsetX;
+                const cy = p.y * state.canvasScale + state.offsetY;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+        ctx.globalAlpha = 1;
+    });
+}
+
+function drawCalibMarker(cx, cy, label, color) {
+    // Crosshair
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, cy); ctx.lineTo(cx + 14, cy);
+    ctx.moveTo(cx, cy - 14); ctx.lineTo(cx, cy + 14);
+    ctx.stroke();
+
+    // Circle
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Label
+    ctx.fillStyle = '#000';
+    ctx.fillRect(cx + 8, cy - 20, label.length * 7 + 8, 18);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 11px JetBrains Mono, monospace';
+    ctx.fillText(label, cx + 12, cy - 6);
+}
+
+function drawGrid() {
+    const cp = state.calibPoints;
+    const xMinPx = (cp[0].x * state.canvasScale + state.offsetX);
+    const xMaxPx = (cp[1].x * state.canvasScale + state.offsetX);
+    const yMaxPy = (cp[2].y * state.canvasScale + state.offsetY);
+    const yMinPy = (cp[3].y * state.canvasScale + state.offsetY);
+
+    const xMaxVal = parseFloat(document.getElementById('xMaxVal').value) || 100;
+    const yMaxVal = parseFloat(document.getElementById('yMaxVal').value) || 200;
+
+    ctx.strokeStyle = 'rgba(34,211,238,0.25)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 4]);
+
+    // Vertical lines at 0,20,40,60,80,100% speed
+    for (let x = 0; x <= xMaxVal; x += 20) {
+        const px = xMinPx + (x / xMaxVal) * (xMaxPx - xMinPx);
+        ctx.beginPath(); ctx.moveTo(px, yMaxPy); ctx.lineTo(px, yMinPy); ctx.stroke();
+    }
+
+    // Horizontal lines at 0, 50, 100, 150, 200%
+    for (let y = 0; y <= yMaxVal; y += 50) {
+        const py = yMinPy - (y / yMaxVal) * (yMinPy - yMaxPy);
+        ctx.beginPath(); ctx.moveTo(xMinPx, py); ctx.lineTo(xMaxPx, py); ctx.stroke();
+    }
+
+    ctx.setLineDash([]);
+
+    // Label grid
+    ctx.fillStyle = 'rgba(34,211,238,0.7)';
+    ctx.font = 'bold 10px JetBrains Mono, monospace';
+    for (let x = 0; x <= xMaxVal; x += 20) {
+        const px = xMinPx + (x / xMaxVal) * (xMaxPx - xMinPx);
+        ctx.fillText(x + '%', px - 10, yMinPy + 14);
+    }
+    for (let y = 0; y <= yMaxVal; y += 50) {
+        const py = yMinPy - (y / yMaxVal) * (yMinPy - yMaxPy);
+        ctx.fillText(y + '%', xMaxPx + 5, py + 4);
+    }
+}
+
+// ─────────────────────────────────────────────
+//  CALIBRATION CLICK HANDLING
+// ─────────────────────────────────────────────
+const CALIB_INSTRUCTIONS = [
+    'Click on X-axis MINIMUM (0% speed point)',
+    'Click on X-axis MAXIMUM (100% speed point)',
+    'Click on Y-axis MAXIMUM (highest value on Y)',
+    'Click on Y-axis MINIMUM (0% point on Y)',
+    '✅ Calibration complete! Proceed to Step 3'
+];
+
+function handleCalibClick(cx, cy) {
+    if (state.calibStep >= 4) return;
+    const imgP = canvasToImg(cx, cy);
+    state.calibPoints.push(imgP);
+    state.calibStep++;
+
+    const status = document.getElementById('calibStatus');
+    status.textContent = CALIB_INSTRUCTIONS[state.calibStep];
+
+    if (state.calibStep >= 4) {
+        status.classList.add('ready');
+        updatePill(2, 'done');
+        updatePill(3, 'active');
+        setTimeout(() => goToStep(3), 600);
+    }
+
+    redraw();
+}
+
+function resetCalibration() {
+    state.calibPoints = [];
+    state.calibStep = 0;
+    const status = document.getElementById('calibStatus');
+    status.textContent = CALIB_INSTRUCTIONS[0];
+    status.classList.remove('ready');
+    redraw();
+}
+
+// ─────────────────────────────────────────────
+//  TRACING
+// ─────────────────────────────────────────────
+function selectCurve(curve) {
+    state.activeCurve = curve;
+    document.querySelectorAll('.curve-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn' + curve.toUpperCase()).classList.add('active');
+}
+
+function addTracePoint(cx, cy) {
+    const imgP = canvasToImg(cx, cy);
+    state.rawPoints[state.activeCurve].push(imgP);
+    updateCurveCount(state.activeCurve);
+    redraw();
+}
+
+function undoLastPoint() {
+    const pts = state.rawPoints[state.activeCurve];
+    if (pts.length > 0) {
+        pts.pop();
+        updateCurveCount(state.activeCurve);
+        redraw();
+    }
+}
+
+function clearCurrentCurve() {
+    state.rawPoints[state.activeCurve] = [];
+    updateCurveCount(state.activeCurve);
+    redraw();
+}
+
+function updateCurveCount(curve) {
+    const count = state.rawPoints[curve].length;
+    document.getElementById('count' + curve.toUpperCase()).textContent = count + ' pts';
+}
+
+// ─────────────────────────────────────────────
+//  EXTRACTION: Raw points → 19 S_POINTS values
+// ─────────────────────────────────────────────
+function extractCurve(curve) {
+    const pts = state.rawPoints[curve];
+    if (pts.length < 2) return null;
+
+    // Convert to data coordinates, sort by X
+    const dataPts = pts
+        .map(p => imgToData(p.x, p.y))
+        .filter(d => d && d.x >= -5 && d.x <= 105 && d.y >= -10 && d.y <= 800)
+        .sort((a, b) => a.x - b.x);
+
+    if (dataPts.length < 2) return null;
+
+    // Sample at each of the 19 S_POINTS using linear interpolation
+    return S_POINTS.map(sp => {
+        // Find bracket
+        let lower = dataPts[0], upper = dataPts[dataPts.length - 1];
+        for (let i = 0; i < dataPts.length - 1; i++) {
+            if (dataPts[i].x <= sp && dataPts[i + 1].x >= sp) {
+                lower = dataPts[i];
+                upper = dataPts[i + 1];
+                break;
+            }
+        }
+        if (lower === upper) return Math.max(0, Math.round(lower.y));
+
+        const t = (upper.x - lower.x) === 0 ? 0 : (sp - lower.x) / (upper.x - lower.x);
+        const val = lower.y + t * (upper.y - lower.y);
+        return Math.max(0, Math.round(val));
+    });
+}
+
+function extractAndPreview() {
+    const mt = extractCurve('mt');
+    const mc = extractCurve('mc');
+    const lt = extractCurve('lt');
+
+    if (!mt && !mc && !lt) {
+        showToast('⚠️ No traced points found! Trace at least one curve.');
+        return;
+    }
+
+    state.extracted.mt = mt || [];
+    state.extracted.mc = mc || [];
+    state.extracted.lt = lt || [];
+
+    renderExtractedTable();
+    goToStep(4);
+    showToast('✅ Extraction complete! Review and apply.');
+}
+
+function renderExtractedTable() {
+    const mt = state.extracted.mt;
+    const mc = state.extracted.mc;
+    const lt = state.extracted.lt;
+
+    let html = `<table>
+        <thead><tr>
+            <th>Speed</th>
+            <th style="color:var(--accent)">Motor T%</th>
+            <th style="color:var(--yellow)">Motor I%</th>
+            <th style="color:var(--red)">Load T%</th>
+        </tr></thead><tbody>`;
+
+    S_POINTS.forEach((sp, i) => {
+        const mtv = mt[i] !== undefined ? mt[i] : null;
+        const mcv = mc[i] !== undefined ? mc[i] : null;
+        const ltv = lt[i] !== undefined ? lt[i] : null;
+
+        html += `<tr>
+            <td>${sp}%</td>
+            <td class="${mtv !== null ? 'mt' : 'empty'}">${mtv !== null ? mtv : '–'}</td>
+            <td class="${mcv !== null ? 'mc' : 'empty'}">${mcv !== null ? mcv : '–'}</td>
+            <td class="${ltv !== null ? 'lt' : 'empty'}">${ltv !== null ? ltv : '–'}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('extractedTable').innerHTML = html;
+}
+
+// ─────────────────────────────────────────────
+//  APPLY TO SIMULATOR
+// ─────────────────────────────────────────────
+function applyToSimulator() {
+    const data = {
+        mt: state.extracted.mt,
+        mc: state.extracted.mc,
+        lt: state.extracted.lt
+    };
+
+    localStorage.setItem('digitizerData', JSON.stringify(data));
+    showToast('✅ Data saved! Returning to simulator...');
+    setTimeout(() => { window.location.href = 'index.html'; }, 800);
+}
+
+function goBack() {
+    window.location.href = 'index.html';
+}
+
+// ─────────────────────────────────────────────
+//  STEP NAVIGATION
+// ─────────────────────────────────────────────
+function goToStep(n) {
+    state.step = n;
+    ['step1Panel', 'step2Panel', 'step3Panel', 'step4Panel'].forEach((id, i) => {
+        document.getElementById(id).style.display = (i + 1 === n) ? 'block' : 'none';
+    });
+}
+
+function updatePill(n, status) {
+    const pill = document.getElementById('pill' + n);
+    pill.classList.remove('active', 'done');
+    if (status) pill.classList.add(status);
+}
+
+// ─────────────────────────────────────────────
+//  CANVAS EVENT HANDLING (Mouse + Touch)
+// ─────────────────────────────────────────────
+function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches) {
+        return {
+            x: e.touches[0].clientX - rect.left,
+            y: e.touches[0].clientY - rect.top
+        };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+canvas.addEventListener('mousedown', e => {
+    if (!state.image) return;
+    const pos = getCanvasPos(e);
+
+    if (state.step === 2) {
+        handleCalibClick(pos.x, pos.y);
+    } else if (state.step === 3) {
+        state.isDrawing = true;
+        addTracePoint(pos.x, pos.y);
+    }
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (!state.isDrawing || state.step !== 3) return;
+    const pos = getCanvasPos(e);
+    const last = state.rawPoints[state.activeCurve];
+    if (last.length > 0) {
+        const prevImg = last[last.length - 1];
+        const prevCx = prevImg.x * state.canvasScale + state.offsetX;
+        const prevCy = prevImg.y * state.canvasScale + state.offsetY;
+        const dist = Math.hypot(pos.x - prevCx, pos.y - prevCy);
+        if (dist > 8) addTracePoint(pos.x, pos.y); // Sample every 8px of movement
+    }
+});
+
+canvas.addEventListener('mouseup', () => { state.isDrawing = false; });
+canvas.addEventListener('mouseleave', () => { state.isDrawing = false; });
+
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (!state.image) return;
+    const pos = getCanvasPos(e);
+    if (state.step === 2) {
+        handleCalibClick(pos.x, pos.y);
+    } else if (state.step === 3) {
+        state.isDrawing = true;
+        addTracePoint(pos.x, pos.y);
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!state.isDrawing || state.step !== 3) return;
+    const pos = getCanvasPos(e);
+    const last = state.rawPoints[state.activeCurve];
+    if (last.length > 0) {
+        const prevImg = last[last.length - 1];
+        const prevCx = prevImg.x * state.canvasScale + state.offsetX;
+        const prevCy = prevImg.y * state.canvasScale + state.offsetY;
+        const dist = Math.hypot(pos.x - prevCx, pos.y - prevCy);
+        if (dist > 6) addTracePoint(pos.x, pos.y);
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    state.isDrawing = false;
+}, { passive: false });
+
+// ─────────────────────────────────────────────
+//  RESIZE
+// ─────────────────────────────────────────────
+window.addEventListener('resize', () => {
+    if (state.image) fitAndDrawImage();
+});
+
+// ─────────────────────────────────────────────
+//  TOAST
+// ─────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
