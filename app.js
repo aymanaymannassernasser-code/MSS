@@ -26,6 +26,7 @@ const PRESETS = {
 };
 
 let chart = null;
+let axesSwapped = false; // false = Torque left / Current right (default)
 let thermalMode = 'percent';
 let simulationMode = 'DOL';
 let lastSimResults = null;
@@ -536,22 +537,30 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
     const isMobile = window.innerWidth < 768;
     const isSmall = window.innerWidth < 480;
     
+    // axesSwapped: false = Torque on left (y), Current on right (y1) — standard
+    //              true  = Current on left (y), Torque on right (y1)
+    const torqueAxis = axesSwapped ? 'y1' : 'y';
+    const currentAxis = axesSwapped ? 'y' : 'y1';
+    const leftLabel  = axesSwapped ? 'Current (%)' : 'Torque (%)';
+    const rightLabel = axesSwapped ? 'Torque (%)' : 'Current (%)';
+    const leftPos = 'left', rightPos = 'right';
+    
     let datasets = [
-        { label: 'Motor Torque (DOL)', data: dolMt, borderColor: '#22d3ee', borderWidth: dolIsSolid ? 3 : 1, borderDash: dolIsSolid ? [] : [5, 5], pointRadius: 0, tension: 0, yAxisID: 'y' },
-        { label: 'Load Torque', data: pLt, borderColor: '#f43f5e', borderDash: [5,5], borderWidth: 2, pointRadius: 0, tension: 0, yAxisID: 'y' },
-        { label: 'Motor Current (DOL)', data: dolMc, borderColor: '#fbbf24', borderWidth: dolIsSolid ? 2 : 1, borderDash: dolIsSolid ? [] : [5, 5], yAxisID: 'y1', pointRadius: 0, tension: 0 }
+        { label: 'Motor Torque (DOL)', data: dolMt, borderColor: '#22d3ee', borderWidth: dolIsSolid ? 3 : 1, borderDash: dolIsSolid ? [] : [5, 5], pointRadius: 0, tension: 0, yAxisID: torqueAxis },
+        { label: 'Load Torque', data: pLt, borderColor: '#f43f5e', borderDash: [5,5], borderWidth: 2, pointRadius: 0, tension: 0, yAxisID: torqueAxis },
+        { label: 'Motor Current (DOL)', data: dolMc, borderColor: '#fbbf24', borderWidth: dolIsSolid ? 2 : 1, borderDash: dolIsSolid ? [] : [5, 5], yAxisID: currentAxis, pointRadius: 0, tension: 0 }
     ];
     
     if (simulationMode === 'SS') {
-        datasets.push({ label: 'Motor Torque (SS)', data: ssMt, borderColor: '#10b981', borderWidth: 3, pointRadius: 0, tension: 0, yAxisID: 'y' });
-        datasets.push({ label: 'Motor Current (SS)', data: ssMc, borderColor: '#f59e0b', borderWidth: 3, pointRadius: 0, tension: 0, yAxisID: 'y1' });
+        datasets.push({ label: 'Motor Torque (SS)', data: ssMt, borderColor: '#10b981', borderWidth: 3, pointRadius: 0, tension: 0, yAxisID: torqueAxis });
+        datasets.push({ label: 'Motor Current (SS)', data: ssMc, borderColor: '#f59e0b', borderWidth: 3, pointRadius: 0, tension: 0, yAxisID: currentAxis });
         
         if (criticalSpeed > 0) {
             const critIdx = Math.round(criticalSpeed / 0.2);
             datasets.push({
                 label: 'Critical', data: [{x: criticalSpeed, y: ssMt[critIdx]}],
                 pointStyle: 'triangle', pointRadius: 12, pointBackgroundColor: '#a855f7',
-                pointBorderColor: '#fff', pointBorderWidth: 2, showLine: false, yAxisID: 'y'
+                pointBorderColor: '#fff', pointBorderWidth: 2, showLine: false, yAxisID: torqueAxis
             });
         }
     }
@@ -561,7 +570,7 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
         datasets.push({ 
             label: 'STALL', data: [{x: stallSpd, y: (simulationMode === 'SS' ? ssMt : dolMt)[stallIdx]}], 
             pointStyle: 'crossRot', pointRadius: 15, pointBackgroundColor: '#ff0000',
-            pointBorderColor: '#fff', pointBorderWidth: 3, showLine: false, yAxisID: 'y'
+            pointBorderColor: '#fff', pointBorderWidth: 3, showLine: false, yAxisID: torqueAxis
         });
     }
     
@@ -593,7 +602,7 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
                 }, 
                 y: {
                     min: 0,
-                    title: {display: true, text: 'Torque (%)', font: {size: 13, weight: 'bold'}, color: '#333'},
+                    title: {display: true, text: leftLabel, font: {size: 13, weight: 'bold'}, color: '#333'},
                     ticks: {color: '#666', font: {size: 10}},
                     grid: {color: 'rgba(0,0,0,0.08)'},
                     position: 'left'
@@ -601,7 +610,7 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
                 y1: {
                     position: 'right', 
                     min: 0,
-                    title: {display: true, text: 'Current (%)', font: {size: 13, weight: 'bold'}, color: '#333'},
+                    title: {display: true, text: rightLabel, font: {size: 13, weight: 'bold'}, color: '#333'},
                     ticks: {color: '#666', font: {size: 10}},
                     grid: {drawOnChartArea: false}
                 } 
@@ -680,6 +689,19 @@ function solveForCurrentFromTime(targetTime) {
     document.getElementById('ssInitialI').value = bestCurrent;
     document.getElementById('ssFinalI').value = bestCurrent;
     runSimulation();
+}
+
+function swapChartAxes() {
+    axesSwapped = !axesSwapped;
+    const btn = document.getElementById('btnSwapAxes');
+    if (btn) {
+        btn.textContent = axesSwapped ? '⇄ Restore T/I Axes' : '⇄ Swap T/I Axes';
+        btn.style.background = axesSwapped ? 'rgba(34,211,238,.12)' : 'rgba(251,191,36,.12)';
+        btn.style.borderColor = axesSwapped ? '#22d3ee' : '#fbbf24';
+        btn.style.color = axesSwapped ? '#22d3ee' : '#fbbf24';
+    }
+    // Re-render chart if data exists
+    if (chart) runSimulation();
 }
 
 function showImportBanner(count) {

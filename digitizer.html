@@ -252,9 +252,25 @@ const CURVES = ['mt','mc','lt'];
 // Axis assignment: which Y axis each curve uses
 const axisMap = {mt:'left', mc:'right', lt:'left'};
 
-// Boundary box (fractions of canvas W/H)
-let box = {l:0.12, t:0.08, r:0.88, b:0.90};
+// Box stored in IMAGE pixel coords — invariant to canvas size/zoom/rotation
+// These are pixels within the original image, not the canvas
+let box = {l:0, t:0, r:0, b:0}; // initialized in fitCanvas when img loads
+let boxInitialized = false;
 let boxLocked = false;
+
+// Convert image-pixel box → current canvas-pixel box (fresh every call)
+function getBP(){
+  return {
+    l: box.l * ST.scale + ST.offX,
+    t: box.t * ST.scale + ST.offY,
+    r: box.r * ST.scale + ST.offX,
+    b: box.b * ST.scale + ST.offY
+  };
+}
+// Convert canvas pos → image pixel pos
+function canvasToPxImg(cx, cy){
+  return { x:(cx - ST.offX) / ST.scale, y:(cy - ST.offY) / ST.scale };
+}
 
 let ST = {
   step:1, img:null,
@@ -303,6 +319,7 @@ function loadImg(f){
     const img=new Image();
     img.onload=()=>{
       ST.img=img;
+      boxInitialized=false; // reset so fitCanvas initializes box for new image
       document.getElementById('hint').style.display='none';
       fitCanvas();
       boxLocked=false;
@@ -325,7 +342,12 @@ function fitCanvas(){
   ST.scale=Math.min(sx,sy);
   ST.offX=(W-ST.img.width*ST.scale)/2;
   ST.offY=(H-ST.img.height*ST.scale)/2;
-  box={l:0.12,t:0.08,r:0.88,b:0.90};
+  // Only set box on first load — on resize/rotation, box (image pixels) is unchanged
+  if(!boxInitialized){
+    box={l:ST.img.width*0.12, t:ST.img.height*0.08,
+         r:ST.img.width*0.88, b:ST.img.height*0.90};
+    boxInitialized=true;
+  }
   redraw();
 }
 window.addEventListener('resize',()=>{if(ST.img)fitCanvas();});
@@ -340,7 +362,8 @@ function lockGrid(){
 }
 function resetGrid(){
   boxLocked=false;
-  box={l:0.12,t:0.08,r:0.88,b:0.90};
+  box={l:ST.img.width*0.12, t:ST.img.height*0.08,
+       r:ST.img.width*0.88, b:ST.img.height*0.90};
   redraw();
 }
 
@@ -399,10 +422,6 @@ function getAx(){
     ryMin:parseFloat(document.getElementById('ryMin').value)||0,
     ryMax:parseFloat(document.getElementById('ryMax').value)||700,
   };
-}
-function getBP(){
-  const W=cv.width,H=cv.height;
-  return{l:box.l*W, t:box.t*H, r:box.r*W, b:box.b*H};
 }
 function canvasToData(cx,cy,useRight){
   const bp=getBP(), ax=getAx();
@@ -807,7 +826,9 @@ function onDown(e){
     if(h){ST.dragBox=h;return;}
     if(pos.x>bp.l&&pos.x<bp.r&&pos.y>bp.t&&pos.y<bp.b){
       ST.dragBox='move';
-      ST._dragStart={...pos,bl:box.l,bt:box.t,br:box.r,bb:box.b};
+      // Store drag start in IMAGE pixels
+      const ip=canvasToPxImg(pos.x,pos.y);
+      ST._dragStart={ix:ip.x,iy:ip.y, bl:box.l,bt:box.t,br:box.r,bb:box.b};
       return;
     }
   }
@@ -839,21 +860,26 @@ function onMove(e){
   const W=cv.width,H=cv.height;
   const MIN_PAD=20;
 
-  // Box drag
+  // Box drag — all math in IMAGE pixel space
   if(ST.dragBox&&!boxLocked){
     const k=ST.dragBox;
+    const ip=canvasToPxImg(pos.x,pos.y); // current pos in image pixels
+    const MIN_PX=20; // minimum box size in image pixels
     if(k==='move'){
-      const dx=(pos.x-ST._dragStart.x)/W, dy=(pos.y-ST._dragStart.y)/H;
+      const dx=ip.x-ST._dragStart.ix, dy=ip.y-ST._dragStart.iy;
       const w=ST._dragStart.br-ST._dragStart.bl, h2=ST._dragStart.bb-ST._dragStart.bt;
-      box.l=Math.max(0.01,Math.min(ST._dragStart.bl+dx,0.98-w));
+      box.l=Math.max(0,Math.min(ST._dragStart.bl+dx, ST.img.width-w));
       box.r=box.l+w;
-      box.t=Math.max(0.01,Math.min(ST._dragStart.bt+dy,0.98-h2));
+      box.t=Math.max(0,Math.min(ST._dragStart.bt+dy, ST.img.height-h2));
       box.b=box.t+h2;
     } else {
-      if(k.includes('l')) box.l=Math.min(pos.x/W,box.r-MIN_PAD/W);
-      if(k.includes('r')) box.r=Math.max(pos.x/W,box.l+MIN_PAD/W);
-      if(k.includes('t')) box.t=Math.min(pos.y/H,box.b-MIN_PAD/H);
-      if(k.includes('b')) box.b=Math.max(pos.y/H,box.t+MIN_PAD/H);
+      if(k.includes('l')) box.l=Math.min(ip.x, box.r-MIN_PX);
+      if(k.includes('r')) box.r=Math.max(ip.x, box.l+MIN_PX);
+      if(k.includes('t')) box.t=Math.min(ip.y, box.b-MIN_PX);
+      if(k.includes('b')) box.b=Math.max(ip.y, box.t+MIN_PX);
+      // Clamp to image bounds
+      box.l=Math.max(0,box.l); box.r=Math.min(ST.img.width,box.r);
+      box.t=Math.max(0,box.t); box.b=Math.min(ST.img.height,box.b);
     }
     redraw();return;
   }
