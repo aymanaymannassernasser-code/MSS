@@ -161,6 +161,7 @@ header{background:#000;border-bottom:2px solid var(--acc);display:flex;
     <div class="info ok" style="margin:10px 0 10px;">
       ✋ <strong>Drag box corners/edges</strong> to align with chart axes. Grid labels update live.
     </div>
+    <button class="abtn" style="background:rgba(251,191,36,.12);border:1px solid #fbbf24;color:#fbbf24;margin-bottom:8px;" onclick="swapAllAxes()">⇄ Swap All Torque/Current Axes</button>
     <button class="abtn a-lock" onclick="lockGrid()">🔒 Lock Grid & Start Tracing</button>
     <button class="abtn a-back" onclick="resetGrid()">↺ Reset Box</button>
   </div>
@@ -175,19 +176,19 @@ header{background:#000;border-bottom:2px solid var(--acc);display:flex;
       <button class="cbtn mt sel" id="bMT" onclick="setCurve('mt')">
         <span class="dot" style="background:var(--acc)"></span>
         Motor Torque
-        <span class="ax-toggle" id="axMT" style="background:rgba(34,211,238,.15);color:var(--acc)" onclick="toggleAxis(event,'mt')">Left Y</span>
+        <span class="ax-toggle" id="axMT" style="background:rgba(34,211,238,.15);color:var(--acc)" onclick="toggleAxis(event,'mt')">Right Y</span>
         <span class="cnt" id="cMT">0 pts</span>
       </button>
       <button class="cbtn mc" id="bMC" onclick="setCurve('mc')">
         <span class="dot" style="background:var(--yel)"></span>
         Motor Current
-        <span class="ax-toggle" id="axMC" style="background:rgba(251,191,36,.15);color:var(--yel)" onclick="toggleAxis(event,'mc')">Right Y</span>
+        <span class="ax-toggle" id="axMC" style="background:rgba(251,191,36,.15);color:var(--yel)" onclick="toggleAxis(event,'mc')">Left Y</span>
         <span class="cnt" id="cMC">0 pts</span>
       </button>
       <button class="cbtn lt" id="bLT" onclick="setCurve('lt')">
         <span class="dot" style="background:var(--red)"></span>
         Load Torque
-        <span class="ax-toggle" id="axLT" style="background:rgba(244,63,94,.15);color:var(--red)" onclick="toggleAxis(event,'lt')">Left Y</span>
+        <span class="ax-toggle" id="axLT" style="background:rgba(244,63,94,.15);color:var(--red)" onclick="toggleAxis(event,'lt')">Right Y</span>
         <span class="cnt" id="cLT">0 pts</span>
       </button>
     </div>
@@ -249,8 +250,8 @@ const N = S_POINTS.length; // 36
 const COL = {mt:'#22d3ee', mc:'#fbbf24', lt:'#f43f5e'};
 const CURVES = ['mt','mc','lt'];
 
-// Axis assignment: which Y axis each curve uses
-const axisMap = {mt:'left', mc:'right', lt:'left'};
+// Default axis assignment: Current LEFT, Torque RIGHT (user preference)
+const axisMap = {mt:'right', mc:'left', lt:'right'};
 
 // Box stored in IMAGE pixel coords — invariant to canvas size/zoom/rotation
 // These are pixels within the original image, not the canvas
@@ -375,6 +376,15 @@ function toggleAxis(e, curve){
   axisMap[curve] = axisMap[curve]==='left'?'right':'left';
   updateAxisBadges();
   redraw(); // ctrl points are in data space — no recompute needed
+}
+function swapAllAxes(){
+  // Toggle all curves between left/right at once
+  CURVES.forEach(c=>{
+    axisMap[c] = axisMap[c]==='left'?'right':'left';
+  });
+  updateAxisBadges();
+  redraw();
+  showToast('⇄ Swapped all axes: Torque ↔ Current');
 }
 function updateAxisBadges(){
   CURVES.forEach(c=>{
@@ -674,20 +684,22 @@ function drawSplineCurve(ctrls,curve,lw,alpha){
 
 function drawCtrlPoints(curve,ctrls,isActive){
   const col=COL[curve];
-  const R=isActive?11:7;
+  // Scale ring size with zoom — larger when zoomed out, smaller when zoomed in
+  const baseR = isActive?11:7;
+  const zoomFactor = 1 / Math.max(0.5, Math.min(ST.scale, 2)); // scale inversely with image scale
+  const R = Math.round(baseR * zoomFactor);
   const useRight=isRight(curve);
   const W=cv.width, H=cv.height;
-  const TOOLTIP_OFFSET=44; // px away from ring edge — clear of the ring
+  const TOOLTIP_OFFSET=44;
 
   ctrls.forEach((p,i)=>{
     if(!p) return;
-    // Convert data→canvas fresh (resize-safe)
     const cp=dataToCanvas(p.sp,p.val,useRight);
     const hov=ST.hovCtrl&&ST.hovCtrl.curve===curve&&ST.hovCtrl.idx===i;
     const r=hov?R+4:R;
     ctx.globalAlpha=isActive?0.95:0.45;
 
-    // Transparent ring with colored border + center dot
+    // Transparent ring + center dot
     ctx.strokeStyle=hov?'#fff':col;
     ctx.lineWidth=hov?2.5:1.5;
     ctx.fillStyle='rgba(0,0,0,0)';
@@ -698,18 +710,18 @@ function drawCtrlPoints(curve,ctrls,isActive){
     ctx.beginPath();ctx.arc(cp.x,cp.y,3,0,Math.PI*2);
     ctx.fill();
 
-    // Speed label (right side of ring)
+    // Speed label — positioned BELOW ring, well clear of curves
     if(isActive){
-      ctx.globalAlpha=0.8;
-      ctx.fillStyle='rgba(0,0,0,0.7)';
-      ctx.fillRect(cp.x+r+3,cp.y-10,30,14);
+      const labelY = cp.y + r + 18; // 18px below ring edge
+      ctx.globalAlpha=0.85;
+      ctx.fillStyle='rgba(0,0,0,0.8)';
+      ctx.fillRect(cp.x-16,labelY-10,32,14);
       ctx.fillStyle=col;
       ctx.font='bold 8px JetBrains Mono,monospace';
-      ctx.fillText(S_POINTS[i]+'%',cp.x+r+5,cp.y+2);
+      ctx.fillText(S_POINTS[i]+'%',cp.x-14,labelY+2);
     }
 
-    // Hover tooltip — positioned well AWAY from the ring
-    // Logic: prefer above; if too close to top edge, go below; always keep inside canvas
+    // Hover tooltip — smart above/below
     if(hov&&isActive){
       const label=Math.round(Math.max(0,p.val))+'%';
       ctx.font='bold 12px JetBrains Mono,monospace';
@@ -717,26 +729,19 @@ function drawCtrlPoints(curve,ctrls,isActive){
       const TW=tw+20, TH=26;
       const ARROW=8;
 
-      // Decide: above or below?
       const goBelow = cp.y - r - TOOLTIP_OFFSET - TH < 8;
-      const tipY = goBelow
-        ? cp.y + r + TOOLTIP_OFFSET
-        : cp.y - r - TOOLTIP_OFFSET - TH;
-      // Center horizontally, clamp to canvas
+      const tipY = goBelow ? cp.y + r + TOOLTIP_OFFSET : cp.y - r - TOOLTIP_OFFSET - TH;
       let tipX = cp.x - TW/2;
       tipX = Math.max(8, Math.min(tipX, W - TW - 8));
 
-      // Pill background
       ctx.globalAlpha=1;
       ctx.fillStyle='rgba(10,12,16,0.96)';
       roundRect(ctx, tipX, tipY, TW, TH, 6);
       ctx.fill();
-      // Colored border
       ctx.strokeStyle=col;ctx.lineWidth=1.5;
       roundRect(ctx, tipX, tipY, TW, TH, 6);
       ctx.stroke();
 
-      // Arrow pointing toward the ring
       const arrowCX=Math.min(Math.max(cp.x, tipX+12), tipX+TW-12);
       ctx.fillStyle='rgba(10,12,16,0.96)';
       ctx.beginPath();
@@ -751,7 +756,6 @@ function drawCtrlPoints(curve,ctrls,isActive){
       }
       ctx.closePath();ctx.fill();
 
-      // Text
       ctx.fillStyle='#fff';
       ctx.textAlign='center';
       ctx.fillText(label, tipX+TW/2, tipY+TH-7);

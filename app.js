@@ -26,7 +26,7 @@ const PRESETS = {
 };
 
 let chart = null;
-let axesSwapped = false; // false = Torque left / Current right (default)
+let axesSwapped = false; // false = Current left / Torque right (NEW DEFAULT)
 let thermalMode = 'percent';
 let simulationMode = 'DOL';
 let lastSimResults = null;
@@ -238,6 +238,8 @@ function updateHeader() {
 }
 
 function calculateMinStartingCurrent(tableMt, tableMc, tableLt) {
+    // Find minimum current where net torque stays positive throughout curve
+    // NO SAFETY MARGIN — returns actual physical minimum
     for (let testCurrent = 200; testCurrent <= 700; testCurrent += 2) {
         let minNetTorque = 999, stallDetected = false, criticalSpeedPoint = 0;
         
@@ -258,7 +260,8 @@ function calculateMinStartingCurrent(tableMt, tableMc, tableLt) {
                 break;
             }
         }
-        if (!stallDetected && minNetTorque >= 2.0) {
+        // Return first current where all net torque ≥ 0 (no safety margin)
+        if (!stallDetected && minNetTorque >= 0.0) {
             return { current: testCurrent, criticalSpeed: criticalSpeedPoint };
         }
     }
@@ -339,8 +342,8 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
             criticalNetSpeed = speedPerc;
         }
         
-        // COMPREHENSIVE STALL DETECTION
-        if (!isStalled && speedPerc < 98) {
+        // COMPREHENSIVE STALL DETECTION (applies throughout entire start, not just <98%)
+        if (!isStalled) {
             // 1. NEGATIVE NET TORQUE (motor can't overcome load)
             if (netTorquePct < 0) {
                 isStalled = true;
@@ -350,7 +353,7 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
             }
             
             // 2. CRITICALLY LOW NET TORQUE (< 0.5%, essentially stuck)
-            if (netTorquePct < 0.5 && speedPerc < 80) {
+            if (netTorquePct < 0.5 && speedPerc < 95) {
                 isStalled = true;
                 stallReason = "Insufficient Torque (<0.5%)";
                 stallSpd = speedPerc;
@@ -387,7 +390,7 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
             
             // 6. EXCESSIVE TIME (max 30s OR 2× hot stall, whichever is less)
             const maxAllowedTime = Math.min(30, hStall * 2);
-            if (time > maxAllowedTime) {
+            if (time > maxAllowedTime && speedPerc < 95) {
                 isStalled = true;
                 stallReason = `Timeout (>${maxAllowedTime.toFixed(0)}s)`;
                 stallSpd = speedPerc;
@@ -397,7 +400,8 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
         
         if (isStalled) break;
         
-        if (speedPerc < 98.5) {
+        // Physics continues ALL THE WAY to 99% (not 98.5%!)
+        if (speedPerc < 99) {
             // Physics: J × dω/dt = T_net
             let netTorqueNm = (netTorquePct / 100.0) * fltNm;
             let angularAccel = netTorqueNm / totalJ;
@@ -441,15 +445,13 @@ function runSimulation() {
     if (simulationMode === 'SS') {
         minStartResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
         
-        // Check if initial current is below minimum (will struggle during ramp)
-        if (ssInitialI < minStartResult.current) {
-            alert(`⚠️ RAMP WARNING\n\nInitial: ${ssInitialI}%\nMinimum: ${minStartResult.current}%\n\nMotor will struggle during ramp phase!\nConsider increasing initial current.`);
-        }
-        
-        // Check if final current is below minimum (will stall)
-        const userFinalCurrent = Math.max(ssInitialI, ssFinalI);
-        if (userFinalCurrent < minStartResult.current) {
-            alert(`⚠️ INSUFFICIENT CURRENT\n\nYour: ${userFinalCurrent}%\nMinimum: ${minStartResult.current}%\n\nMotor will STALL at ~${minStartResult.criticalSpeed}% speed.`);
+        // Only warn if FINAL current is below minimum (initial can be low if ramping)
+        const finalCurrent = Math.max(ssInitialI, ssFinalI);
+        if (finalCurrent < minStartResult.current) {
+            alert(`⚠️ INSUFFICIENT FINAL CURRENT\n\nYour final: ${finalCurrent}%\nMinimum: ${minStartResult.current}%\n\nMotor will likely STALL at ~${minStartResult.criticalSpeed}% speed.`);
+        } else if (ssInitialI < minStartResult.current && ssRampTime > 0) {
+            // Initial is low but final is OK — just inform user
+            console.log(`ℹ️ Ramp starts below minimum (${ssInitialI}% < ${minStartResult.current}%) but ramps to sufficient current (${finalCurrent}%) — should work if ramp is fast enough.`);
         }
     }
 
@@ -537,12 +539,12 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
     const isMobile = window.innerWidth < 768;
     const isSmall = window.innerWidth < 480;
     
-    // axesSwapped: false = Torque on left (y), Current on right (y1) — standard
-    //              true  = Current on left (y), Torque on right (y1)
-    const torqueAxis = axesSwapped ? 'y1' : 'y';
-    const currentAxis = axesSwapped ? 'y' : 'y1';
-    const leftLabel  = axesSwapped ? 'Current (%)' : 'Torque (%)';
-    const rightLabel = axesSwapped ? 'Torque (%)' : 'Current (%)';
+    // axesSwapped: false = Current on left (y), Torque on right (y1) — NEW DEFAULT
+    //              true  = Torque on left (y), Current on right (y1)
+    const torqueAxis = axesSwapped ? 'y' : 'y1';
+    const currentAxis = axesSwapped ? 'y1' : 'y';
+    const leftLabel  = axesSwapped ? 'Torque (%)' : 'Current (%)';
+    const rightLabel = axesSwapped ? 'Current (%)' : 'Torque (%)';
     const leftPos = 'left', rightPos = 'right';
     
     let datasets = [
@@ -646,48 +648,46 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
 }
 
 function solveForCurrentFromTime(targetTime) {
-    const ssRampTime = parseFloat(document.getElementById('ssRampTime')?.value) || 0;
+    const ssInitialI = parseFloat(document.getElementById('ssInitialI').value) || 300;
+    const ssRampTime = parseFloat(document.getElementById('ssRampTime').value) || 0;
     let low = 200, high = 700, iterations = 0;
-    let bestCurrent = 0, bestTime = 999;
+    let bestFinalCurrent = 0, bestTime = 999;
     
-    // Binary search for current that gives target time
+    // Binary search for FINAL current that gives target time (initial + ramp stay fixed)
     while (high - low > 5 && iterations < 25) {
         let mid = Math.floor((low + high) / 2);
-        let result = runSimulationCore('SS', mid, mid, ssRampTime, true);
+        // Test with fixed initial, varying final
+        let result = runSimulationCore('SS', ssInitialI, mid, ssRampTime, true);
         
-        console.log(`Iteration ${iterations}: Testing ${mid}% → ${result.time.toFixed(1)}s (target: ${targetTime}s, stalled: ${result.isStalled})`);
+        console.log(`Iteration ${iterations}: Initial ${ssInitialI}%, Final ${mid}%, Ramp ${ssRampTime}s → ${result.time.toFixed(1)}s (target: ${targetTime}s)`);
         
         if (result.isStalled) {
-            // Stalled - need MORE current
             low = mid + 1;
         } else if (result.time > targetTime) {
-            // Too slow - need MORE current
             low = mid + 1;
         } else {
-            // Fast enough - try LESS current, but save this as best
             high = mid - 1;
-            if (result.time < bestTime || bestCurrent === 0) {
-                bestCurrent = mid;
+            if (result.time < bestTime || bestFinalCurrent === 0) {
+                bestFinalCurrent = mid;
                 bestTime = result.time;
             }
         }
         iterations++;
     }
     
-    // If no solution found, try the minimum starting current
-    if (bestCurrent === 0) {
+    if (bestFinalCurrent === 0) {
         const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);
         const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
         const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
         const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
-        bestCurrent = minResult.current;
-        alert(`⚠️ Could not find current for ${targetTime}s.\n\nUsing minimum starting current: ${bestCurrent}%`);
+        bestFinalCurrent = minResult.current;
+        alert(`⚠️ Could not find final current for ${targetTime}s.\n\nUsing minimum: ${bestFinalCurrent}%`);
     } else {
-        console.log(`✓ Found: ${bestCurrent}% gives ${bestTime.toFixed(2)}s`);
+        console.log(`✓ Found: Initial ${ssInitialI}%, Final ${bestFinalCurrent}% → ${bestTime.toFixed(2)}s`);
     }
     
-    document.getElementById('ssInitialI').value = bestCurrent;
-    document.getElementById('ssFinalI').value = bestCurrent;
+    // ONLY update final current field (preserve initial + ramp)
+    document.getElementById('ssFinalI').value = bestFinalCurrent;
     runSimulation();
 }
 
@@ -695,12 +695,12 @@ function swapChartAxes() {
     axesSwapped = !axesSwapped;
     const btn = document.getElementById('btnSwapAxes');
     if (btn) {
-        btn.textContent = axesSwapped ? '⇄ Restore T/I Axes' : '⇄ Swap T/I Axes';
+        // false = Current LEFT (default), true = Torque LEFT (swapped)
+        btn.textContent = axesSwapped ? '⇄ Restore I/T Axes' : '⇄ Swap I/T Axes';
         btn.style.background = axesSwapped ? 'rgba(34,211,238,.12)' : 'rgba(251,191,36,.12)';
         btn.style.borderColor = axesSwapped ? '#22d3ee' : '#fbbf24';
         btn.style.color = axesSwapped ? '#22d3ee' : '#fbbf24';
     }
-    // Re-render chart if data exists
     if (chart) runSimulation();
 }
 
