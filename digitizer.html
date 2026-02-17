@@ -260,7 +260,7 @@ let ST = {
   step:1, img:null,
   scale:1, offX:0, offY:0,
   raw:{mt:[], mc:[], lt:[]},
-  ctrl:{mt:[], mc:[], lt:[]}, // length N, canvas {x,y}
+  ctrl:{mt:[], mc:[], lt:[]}, // length N, DATA SPACE {sp, val} — never canvas pixels
   activeCurve:'mt',
   refineActive:'mt',
   dragBox:null,
@@ -351,12 +351,7 @@ function toggleAxis(e, curve){
   e.stopPropagation();
   axisMap[curve] = axisMap[curve]==='left'?'right':'left';
   updateAxisBadges();
-  // Recompute ctrl positions if they exist
-  if(ST.ctrl[curve].length>0){
-    const data = ctrlsToData(curve);
-    ST.ctrl[curve] = dataToCtrl(data, curve);
-  }
-  redraw();
+  redraw(); // ctrl points are in data space — no recompute needed
 }
 function updateAxisBadges(){
   CURVES.forEach(c=>{
@@ -429,25 +424,18 @@ function dataToCanvas(dataX,dataY,useRight){
 }
 function isRight(c){return axisMap[c]==='right';}
 
-// Convert ctrl canvas points → data values
+// ctrl is now stored as {sp, val} in DATA SPACE — canvas coords computed fresh each draw
+// Get canvas position for a ctrl data point (resize-safe)
+function ctrlCanvasPos(sp, val, curve){
+  return dataToCanvas(sp, val, isRight(curve));
+}
+// Legacy helper — converts old canvas-space ctrls to data (used only if old format detected)
 function ctrlsToData(curve){
   return ST.ctrl[curve].map((p,i)=>{
+    if(p.val !== undefined) return p; // already data space
     const d=canvasToData(p.x,p.y,isRight(curve));
     return{sp:S_POINTS[i], val:Math.max(0,Math.round(d.y))};
   });
-}
-// Convert data values → ctrl canvas points (X fixed, Y from value)
-function dataToCtrl(dataArr, curve){
-  return dataArr.map(d=>{
-    const cp=dataToCanvas(d.sp,d.val,isRight(curve));
-    return{x:cp.x, y:cp.y};
-  });
-}
-// Get the fixed canvas X for a given S_POINT index
-function ctrlX(i){
-  const bp=getBP(), ax=getAx();
-  const fx=(S_POINTS[i]-ax.xMin)/(ax.xMax-ax.xMin);
-  return bp.l+fx*(bp.r-bp.l);
 }
 
 // ═══════════════════════════════════════════════════
@@ -494,16 +482,15 @@ function extractCurve(curve){
   if(data.length<2) return null;
 
   // For each S_POINT, linear interpolate the raw traced data
+  // Returns DATA SPACE {sp, val} — resize-safe
   return S_POINTS.map((sp,i)=>{
     let lo=data[0],hi=data[data.length-1];
     for(let j=0;j<data.length-1;j++){
       if(data[j].x<=sp&&data[j+1].x>=sp){lo=data[j];hi=data[j+1];break;}
     }
     const t=(hi.x===lo.x)?0:(sp-lo.x)/(hi.x-lo.x);
-    const dY=lo.y+t*(hi.y-lo.y);
-    // Canvas point: X fixed to speed, Y from data
-    const cp=dataToCanvas(sp,dY,useRight);
-    return{x:ctrlX(i), y:cp.y}; // X always fixed!
+    const val=Math.max(0, lo.y+t*(hi.y-lo.y));
+    return{sp, val}; // data space — never canvas pixels
   });
 }
 
@@ -514,10 +501,7 @@ function buildTable(){
   const vals={mt:[],mc:[],lt:[]};
   CURVES.forEach(c=>{
     if(ST.ctrl[c].length===N){
-      vals[c]=ST.ctrl[c].map((p,i)=>{
-        const d=canvasToData(p.x,p.y,isRight(c));
-        return Math.max(0,Math.round(d.y));
-      });
+      vals[c]=ST.ctrl[c].map(p=>Math.max(0,Math.round(p.val)));
     }
   });
   ST._vals=vals;
@@ -575,7 +559,7 @@ function redraw(){
       if(ST.ctrl[c].length!==N) return;
       const active=step===4&&c===ST.refineActive;
       // Smooth curve through ctrl points
-      drawSplineCurve(ST.ctrl[c],COL[c],active?2.5:1.2,active?0.7:0.35);
+      drawSplineCurve(ST.ctrl[c],c,active?2.5:1.2,active?0.7:0.35);
       // Control points
       drawCtrlPoints(c,ST.ctrl[c],active);
     });
@@ -652,14 +636,17 @@ function getHandles(bp){
   ];
 }
 
-function drawSplineCurve(pts,col,lw,alpha){
-  if(pts.length<2) return;
-  ctx.strokeStyle=col;ctx.lineWidth=lw;ctx.globalAlpha=alpha;
+function drawSplineCurve(ctrls,curve,lw,alpha){
+  // ctrls is DATA SPACE {sp,val} — convert fresh each draw
+  if(ctrls.length<2) return;
+  const useRight=isRight(curve);
+  const canvasPts=ctrls.map(p=>dataToCanvas(p.sp,p.val,useRight));
+  ctx.strokeStyle=COL[curve];ctx.lineWidth=lw;ctx.globalAlpha=alpha;
   ctx.beginPath();
-  pts.forEach((p,i)=>{
+  canvasPts.forEach((p,i)=>{
     if(!p) return;
     if(i===0){ctx.moveTo(p.x,p.y);return;}
-    const prev=pts[i-1];if(!prev) return;
+    const prev=canvasPts[i-1];if(!prev) return;
     const cpx=(prev.x+p.x)/2;
     ctx.bezierCurveTo(cpx,prev.y,cpx,p.y,p.x,p.y);
   });
@@ -668,47 +655,101 @@ function drawSplineCurve(pts,col,lw,alpha){
 
 function drawCtrlPoints(curve,ctrls,isActive){
   const col=COL[curve];
-  const R=isActive?11:7; // radius
+  const R=isActive?11:7;
+  const useRight=isRight(curve);
+  const W=cv.width, H=cv.height;
+  const TOOLTIP_OFFSET=44; // px away from ring edge — clear of the ring
+
   ctrls.forEach((p,i)=>{
     if(!p) return;
+    // Convert data→canvas fresh (resize-safe)
+    const cp=dataToCanvas(p.sp,p.val,useRight);
     const hov=ST.hovCtrl&&ST.hovCtrl.curve===curve&&ST.hovCtrl.idx===i;
     const r=hov?R+4:R;
     ctx.globalAlpha=isActive?0.95:0.45;
 
-    // Transparent ring with colored border
+    // Transparent ring with colored border + center dot
     ctx.strokeStyle=hov?'#fff':col;
     ctx.lineWidth=hov?2.5:1.5;
-    ctx.fillStyle='rgba(0,0,0,0)'; // fully transparent fill
-    ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0)';
+    ctx.beginPath();ctx.arc(cp.x,cp.y,r,0,Math.PI*2);
     ctx.fill();ctx.stroke();
 
-    // Center dot
     ctx.fillStyle=hov?'#fff':col;
-    ctx.beginPath();ctx.arc(p.x,p.y,2.5,0,Math.PI*2);
+    ctx.beginPath();ctx.arc(cp.x,cp.y,3,0,Math.PI*2);
     ctx.fill();
 
-    // Speed label for active curve
+    // Speed label (right side of ring)
     if(isActive){
-      ctx.fillStyle='rgba(0,0,0,0.75)';
-      ctx.fillRect(p.x+r+3,p.y-11,32,14);
+      ctx.globalAlpha=0.8;
+      ctx.fillStyle='rgba(0,0,0,0.7)';
+      ctx.fillRect(cp.x+r+3,cp.y-10,30,14);
       ctx.fillStyle=col;
       ctx.font='bold 8px JetBrains Mono,monospace';
-      ctx.fillText(S_POINTS[i]+'%',p.x+r+5,p.y+1);
+      ctx.fillText(S_POINTS[i]+'%',cp.x+r+5,cp.y+2);
     }
 
-    // Hover value tooltip
+    // Hover tooltip — positioned well AWAY from the ring
+    // Logic: prefer above; if too close to top edge, go below; always keep inside canvas
     if(hov&&isActive){
-      const d=canvasToData(p.x,p.y,isRight(curve));
-      const label=Math.max(0,Math.round(d.y))+'%';
-      const tw=ctx.measureText(label).width+14;
-      ctx.fillStyle='rgba(0,0,0,0.9)';
-      ctx.fillRect(p.x-tw/2,p.y-r-26,tw,20);
+      const label=Math.round(Math.max(0,p.val))+'%';
+      ctx.font='bold 12px JetBrains Mono,monospace';
+      const tw=ctx.measureText(label).width;
+      const TW=tw+20, TH=26;
+      const ARROW=8;
+
+      // Decide: above or below?
+      const goBelow = cp.y - r - TOOLTIP_OFFSET - TH < 8;
+      const tipY = goBelow
+        ? cp.y + r + TOOLTIP_OFFSET
+        : cp.y - r - TOOLTIP_OFFSET - TH;
+      // Center horizontally, clamp to canvas
+      let tipX = cp.x - TW/2;
+      tipX = Math.max(8, Math.min(tipX, W - TW - 8));
+
+      // Pill background
+      ctx.globalAlpha=1;
+      ctx.fillStyle='rgba(10,12,16,0.96)';
+      roundRect(ctx, tipX, tipY, TW, TH, 6);
+      ctx.fill();
+      // Colored border
+      ctx.strokeStyle=col;ctx.lineWidth=1.5;
+      roundRect(ctx, tipX, tipY, TW, TH, 6);
+      ctx.stroke();
+
+      // Arrow pointing toward the ring
+      const arrowCX=Math.min(Math.max(cp.x, tipX+12), tipX+TW-12);
+      ctx.fillStyle='rgba(10,12,16,0.96)';
+      ctx.beginPath();
+      if(goBelow){
+        ctx.moveTo(arrowCX-ARROW/2, tipY);
+        ctx.lineTo(arrowCX+ARROW/2, tipY);
+        ctx.lineTo(arrowCX, tipY-ARROW);
+      } else {
+        ctx.moveTo(arrowCX-ARROW/2, tipY+TH);
+        ctx.lineTo(arrowCX+ARROW/2, tipY+TH);
+        ctx.lineTo(arrowCX, tipY+TH+ARROW);
+      }
+      ctx.closePath();ctx.fill();
+
+      // Text
       ctx.fillStyle='#fff';
-      ctx.font='bold 11px JetBrains Mono,monospace';
-      ctx.textAlign='center';ctx.fillText(label,p.x,p.y-r-11);ctx.textAlign='left';
+      ctx.textAlign='center';
+      ctx.fillText(label, tipX+TW/2, tipY+TH-7);
+      ctx.textAlign='left';
     }
     ctx.globalAlpha=1;
   });
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
 }
 
 // ═══════════════════════════════════════════════════
@@ -725,10 +766,12 @@ function hitHandle(pos,bp){
 }
 function hitCtrl(pos,curve){
   const pts=ST.ctrl[curve];
-  const R=14;
+  const useRight=isRight(curve);
+  const R=16; // generous hit radius
   for(let i=pts.length-1;i>=0;i--){
     if(!pts[i]) continue;
-    if(Math.hypot(pos.x-pts[i].x,pos.y-pts[i].y)<R) return i;
+    const cp=dataToCanvas(pts[i].sp,pts[i].val,useRight);
+    if(Math.hypot(pos.x-cp.x,pos.y-cp.y)<R) return i;
   }
   return -1;
 }
@@ -822,11 +865,15 @@ function onMove(e){
     return;
   }
 
-  // Ctrl point drag — Y ONLY, X LOCKED to speed position
+  // Ctrl point drag — Y ONLY in DATA SPACE, X (sp) always fixed
   if(ST.dragCtrl&&ST.step===4){
     const{curve,idx}=ST.dragCtrl;
-    const fixedX=ctrlX(idx); // always use the speed-derived X
-    ST.ctrl[curve][idx]={x:fixedX, y:pos.y};
+    const sp=S_POINTS[idx]; // sp is immutable
+    // Convert the current canvas Y position to a data value
+    const useRight=isRight(curve);
+    const d=canvasToData(0, pos.y, useRight); // x doesn't matter for Y reading
+    const newVal=Math.max(0, d.y);
+    ST.ctrl[curve][idx]={sp, val:newVal}; // store DATA SPACE — survives resize!
     redraw();return;
   }
 
