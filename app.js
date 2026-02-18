@@ -346,6 +346,11 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
         if (!isStalled) {
             // 1. NEGATIVE NET TORQUE (motor can't overcome load)
             if (netTorquePct < 0) {
+                console.error(`🛑 STALL: Negative Net Torque at ${speedPerc.toFixed(1)}% speed`);
+                console.error(`  Motor Torque: ${actualMotorTorquePct.toFixed(1)}%`);
+                console.error(`  Load Torque: ${loadTorquePct.toFixed(1)}%`);
+                console.error(`  Net Torque: ${netTorquePct.toFixed(1)}%`);
+                console.error(`  Mode: ${mode}, Time: ${time.toFixed(2)}s`);
                 isStalled = true;
                 stallReason = "Insufficient Torque (Negative)";
                 stallSpd = speedPerc;

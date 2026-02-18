@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>How This Works — Motor Starter Simulator Documentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0b0e;--panel:#111318;--border:#1e2535;--acc:#22d3ee;--grn:#10b981;--red:#f43f5e;--yel:#fbbf24;--mut:#64748b;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;line-height:1.7;padding:40px 20px;}
+.container{max-width:900px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:40px;}
+h1{font-size:2.5rem;font-weight:800;color:#fff;margin-bottom:1rem;letter-spacing:-0.5px;}
+h2{font-size:1.8rem;font-weight:700;color:var(--acc);margin:2.5rem 0 1rem;border-bottom:2px solid var(--border);padding-bottom:0.5rem;}
+h3{font-size:1.3rem;font-weight:700;color:var(--yel);margin:2rem 0 0.8rem;}
+p{margin:1rem 0;color:#cbd5e1;}
+code{background:#0a0c10;color:var(--acc);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.9em;}
+pre{background:#0a0c10;border:1px solid var(--border);border-radius:8px;padding:1.2rem;overflow-x:auto;margin:1.5rem 0;}
+pre code{background:none;padding:0;}
+.formula{background:#0f1117;border-left:4px solid var(--grn);padding:1rem 1.2rem;margin:1.5rem 0;border-radius:6px;}
+.formula strong{color:var(--grn);}
+.warning{background:rgba(244,63,94,0.1);border-left:4px solid var(--red);padding:1rem 1.2rem;margin:1.5rem 0;border-radius:6px;}
+.warning strong{color:var(--red);}
+.btn-back{display:inline-block;margin-top:3rem;padding:12px 24px;background:var(--acc);color:#000;font-weight:700;text-decoration:none;border-radius:8px;transition:all 0.2s;}
+.btn-back:hover{background:#06b6d4;transform:translateY(-2px);}
+ul{margin:1rem 0 1rem 2rem;}
+li{margin:0.5rem 0;color:#cbd5e1;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>⚙️ How This Works</h1>
+<p style="font-size:1.1rem;color:var(--mut);">Complete technical documentation of the Motor Starter Simulator physics engine</p>
+
+<h2>🎯 Core Physics Model</h2>
+<p>The simulator is built on fundamental electromechanical principles. Every calculation follows IEEE standards and real-world motor physics.</p>
+
+<h3>1. Fundamental Equations</h3>
+
+<div class="formula">
+<strong>Newton's Second Law for Rotation:</strong><br>
+<code>J × dω/dt = T_net</code>
+<br><br>
+Where:<br>
+• <code>J</code> = Total inertia (motor + load) in kg·m²<br>
+• <code>ω</code> = Angular velocity in rad/s<br>
+• <code>T_net</code> = Net torque = Motor torque - Load torque (Nm)<br>
+• <code>dt</code> = Time step = 0.01 seconds
+</div>
+
+<div class="formula">
+<strong>Voltage-Current-Torque Relationships (Soft Start):</strong><br>
+<code>V ∝ I</code> (linear relationship)<br>
+<code>T ∝ V²</code> (torque proportional to voltage squared)<br>
+<code>∴ T ∝ I²</code> (torque proportional to current squared)
+<br><br>
+Implementation:<br>
+<code>voltageRatio = min(1.0, currentLimit / motorCurrentAtSpeed)</code><br>
+<code>actualTorque = fullVoltageTorque × voltageRatio²</code><br>
+<code>actualCurrent = fullVoltageCurrent × voltageRatio</code>
+</div>
+
+<div class="formula">
+<strong>Thermal Accumulation:</strong><br>
+<code>Thermal = ∫ I²dt</code>
+<br><br>
+Capacity (hot stall):<br>
+<code>Q_max = (LRC in amps)² × t_hotstall</code>
+<br><br>
+Thermal percentage:<br>
+<code>thermal% = (accumulated_I²t / Q_max) × 100</code>
+<br><br>
+When <code>thermal% ≥ 100%</code> → Thermal overload stall
+</div>
+
+<h3>2. Speed Calculation</h3>
+<pre><code>// Each iteration (dt = 0.01s):
+netTorque_Nm = (netTorque% / 100) × FLT_Nm
+angularAccel = netTorque_Nm / totalInertia
+ω += angularAccel × dt
+speed% = (ω / ω_rated) × 100</code></pre>
+
+<h3>3. Curve Interpolation</h3>
+<p>The simulator uses <strong>monotonic cubic spline interpolation</strong> (Fritsch-Carlson algorithm) for smooth, physically realistic curves between the 36 data points.</p>
+
+<pre><code>// For any speed value, interpolate from table:
+motorTorque% = interpolate(speed%, S_POINTS, tableMt)
+motorCurrent% = interpolate(speed%, S_POINTS, tableMc)
+loadTorque% = interpolate(speed%, S_POINTS, tableLt)</code></pre>
+
+<p>The 36 S_POINTS are distributed as:</p>
+<ul>
+<li>0-70%: Every 5% (15 points) — steady-state region</li>
+<li>70-85%: Every 3% (5 points) — transition</li>
+<li>85-100%: Every 1% (16 points) — critical near-synchronous region</li>
+</ul>
+
+<h2>🛑 Stall Detection Logic</h2>
+<p>The simulator checks 6 independent stall conditions on every time step:</p>
+
+<h3>1. Negative Net Torque</h3>
+<pre><code>if (motorTorque% - loadTorque% < 0) → STALL
+Reason: "Insufficient Torque (Negative)"</code></pre>
+<p><strong>Physical meaning:</strong> Load torque exceeds motor torque — motor physically cannot accelerate.</p>
+
+<h3>2. Critically Low Net Torque</h3>
+<pre><code>if (netTorque% < 0.5% AND speed < 95%) → STALL
+Reason: "Insufficient Torque (<0.5%)"</code></pre>
+<p><strong>Physical meaning:</strong> Net torque too small to overcome friction and accelerate meaningfully.</p>
+
+<h3>3. Thermal Overload</h3>
+<pre><code>if (thermal% ≥ 100%) → STALL
+Reason: "Thermal Overload"</code></pre>
+<p><strong>Physical meaning:</strong> Accumulated I²t exceeds motor thermal capacity — protection trips.</p>
+
+<h3>4. Hung Motor (No Acceleration)</h3>
+<pre><code>// Checked every 1.5 seconds:
+if (|Δspeed| < 0.3% over 1.5s AND time > 2s) → STALL
+Reason: "Hung (No Acceleration)"</code></pre>
+<p><strong>Physical meaning:</strong> Motor is running but not accelerating — indicates stall without numerical instability.</p>
+
+<h3>5. Creeping (Too Slow)</h3>
+<pre><code>if (time > 20s AND speed < 50%) → STALL
+Reason: "Too Slow (Creeping - Insufficient Current)"</code></pre>
+<p><strong>Physical meaning:</strong> Motor taking unreasonably long to reach 50% — insufficient starting current.</p>
+
+<h3>6. Timeout</h3>
+<pre><code>maxTime = min(30s, 2 × t_hotstall)
+if (time > maxTime AND speed < 95%) → STALL
+Reason: "Timeout (>Xs)"</code></pre>
+<p><strong>Physical meaning:</strong> Excessive starting time — likely to cause thermal damage or utility voltage dip complaints.</p>
+
+<div class="warning">
+<strong>⚠️ Critical:</strong> All 6 checks apply throughout the ENTIRE start (0-99% speed). They are NOT disabled at high speeds.
+</div>
+
+<h2>🔄 Soft Start Ramping</h2>
+
+<h3>Current Limit Calculation</h3>
+<pre><code>if (time ≤ rampTime):
+    currentLimit% = initial% + (final% - initial%) × (time / rampTime)
+else:
+    currentLimit% = final%</code></pre>
+
+<h3>Torque Reduction</h3>
+<pre><code>voltageRatio = min(1.0, currentLimit / motorCurrentAtSpeed)
+actualMotorTorque = fullVoltageTorque × voltageRatio²
+actualMotorCurrent = fullVoltageCurrent × voltageRatio</code></pre>
+
+<p><strong>Why squared?</strong> Because torque depends on flux × current, and both are proportional to voltage in an induction motor. Thus <code>T ∝ V² ∝ I²</code>.</p>
+
+<h2>📊 Minimum Starting Current</h2>
+
+<h3>Algorithm</h3>
+<pre><code>// Binary search from 200% to 700%:
+for testCurrent = 200 to 700 (step 2%):
+    simulate from 0% to 95% speed
+    if ANY point has netTorque < 0:
+        testCurrent is insufficient
+    else:
+        return testCurrent  // First current where all net torque ≥ 0</code></pre>
+
+<p><strong>No safety margin is added</strong> — the returned value is the true physical minimum where net torque stays positive throughout the curve.</p>
+
+<h2>🔁 Time-to-Current Reverse Solver</h2>
+
+<h3>Case 1: No Ramp (Initial == Final)</h3>
+<pre><code>// Find single current that achieves target time:
+binarySearch(200% to 700%):
+    if simulationTime(current) ≈ targetTime:
+        return current
+// Set both initial and final to this value</code></pre>
+
+<h3>Case 2: With Ramp (Initial ≠ Final)</h3>
+<pre><code>// Preserve initial and ramp, find only final:
+binarySearch(initial% to 700%):
+    if simulationTime(initial, final, ramp) ≈ targetTime:
+        return final
+// Update only final current</code></pre>
+
+<h2>📈 Chart Rendering</h2>
+
+<h3>Data Generation</h3>
+<pre><code>// Generate 501 interpolated points (0-100% in 0.2% steps):
+for speed = 0 to 100 step 0.2:
+    dolMotorTorque[i] = interpolate(speed, S_POINTS, tableMt)
+    dolMotorCurrent[i] = interpolate(speed, S_POINTS, tableMc)
+    loadTorque[i] = interpolate(speed, S_POINTS, tableLt)
+    
+    if (Soft Start mode):
+        currentAtThisSpeed = calculate from ramp profile
+        voltageRatio = min(1, currentAtThisSpeed / dolMotorCurrent[i])
+        ssMotorTorque[i] = dolMotorTorque[i] × voltageRatio²
+        ssMotorCurrent[i] = currentAtThisSpeed</code></pre>
+
+<h3>Axis Configuration</h3>
+<p><strong>Default (axesSwapped = false):</strong></p>
+<ul>
+<li>Left Y-axis: Current (0-700%+)</li>
+<li>Right Y-axis: Torque (0-300%+)</li>
+</ul>
+
+<p><strong>Swapped (axesSwapped = true):</strong></p>
+<ul>
+<li>Left Y-axis: Torque</li>
+<li>Right Y-axis: Current</li>
+</ul>
+
+<h2>🎨 Curve Digitizer</h2>
+
+<h3>Coordinate Transformation</h3>
+<pre><code>// Canvas pixels → Data values:
+fx = (canvasX - boxLeft) / boxWidth
+fy = (canvasY - boxTop) / boxHeight
+
+dataX = xMin + fx × (xMax - xMin)
+dataY = useRightAxis 
+    ? yRightMax + fy × (yRightMin - yRightMax)  // inverted
+    : yLeftMax + fy × (yLeftMin - yLeftMax)     // inverted</code></pre>
+
+<p><strong>Note:</strong> Y is inverted because canvas coordinates increase downward, but data values increase upward.</p>
+
+<h3>Control Point Storage</h3>
+<p>Control points are stored as <code>{sp: speedPercent, val: dataValue}</code> in <strong>data space</strong>, not canvas pixels. This makes them invariant to zoom, rotation, or canvas resize.</p>
+
+<h3>Curve Extraction</h3>
+<ol>
+<li>User traces curve with finger/mouse → raw canvas pixel array</li>
+<li>Convert all pixels to data space using canvas-to-data transform</li>
+<li>For each of 36 S_POINTS speeds, linearly interpolate between traced points</li>
+<li>Store as <code>{sp, val}</code> array</li>
+<li>Export to simulator as integer percentages</li>
+</ol>
+
+<h2>🔢 Data Table Structure</h2>
+
+<p>The simulator uses 36 data points per curve (motor torque, motor current, load torque) at the following speeds:</p>
+
+<pre><code>S_POINTS = [
+  0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70,
+  73, 76, 79, 82, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94,
+  95, 96, 97, 98, 99, 100
+]</code></pre>
+
+<p>Each table cell contains a percentage value. The simulation reads these via:</p>
+<pre><code>const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);</code></pre>
+
+<h2>⚡ Simulation Loop</h2>
+
+<h3>Complete Algorithm</h3>
+<pre><code>initialize: time=0, speed%=0, ω=0, thermal=0
+
+while (time < 60s AND speed < 99%):
+    // 1. Read curves at current speed
+    motorTorque% = interpolate(speed%, S_POINTS, tableMt)
+    motorCurrent% = interpolate(speed%, S_POINTS, tableMc)
+    loadTorque% = interpolate(speed%, S_POINTS, tableLt)
+    
+    // 2. Apply soft start voltage reduction (if applicable)
+    if (Soft Start mode):
+        currentLimit% = calculate from ramp profile
+        voltageRatio = min(1.0, currentLimit / motorCurrent%)
+        actualMotorTorque% = motorTorque% × voltageRatio²
+        actualMotorCurrent% = motorCurrent% × voltageRatio
+    else:
+        actualMotorTorque% = motorTorque%
+        actualMotorCurrent% = motorCurrent%
+    
+    // 3. Calculate net torque
+    netTorque% = actualMotorTorque% - loadTorque%
+    
+    // 4. Check ALL 6 stall conditions
+    if (any stall condition met):
+        STOP and report stall
+    
+    // 5. Update physics
+    netTorque_Nm = (netTorque% / 100) × FLT_Nm
+    angularAccel = netTorque_Nm / totalInertia
+    ω += angularAccel × dt
+    speed% = (ω / ω_rated) × 100
+    
+    // 6. Accumulate thermal
+    current_Amps = (actualMotorCurrent% / 100) × FLC_Amps
+    thermal_I²t += current_Amps² × dt
+    thermal% = (thermal_I²t / Q_max) × 100
+    
+    // 7. Advance time
+    time += dt
+
+return: time, thermal%, minNetTorque%, finalSlip</code></pre>
+
+<h2>🐛 Common Issues & Debugging</h2>
+
+<h3>False Stalls</h3>
+<p><strong>Symptom:</strong> Simulation reports STALL but chart shows positive net torque</p>
+<p><strong>Causes:</strong></p>
+<ul>
+<li>Table values don't match chart values — check if data was imported correctly</li>
+<li>Axis assignments mixed up — verify Motor Torque and Motor Current are on correct Y-axes in digitizer</li>
+<li>Load torque values too high (>150%) — indicates wrong axis scale during tracing</li>
+</ul>
+
+<h3>Axis Configuration Validation</h3>
+<p>The digitizer includes validation: if Load Torque > 150%, it warns that the curve was likely traced on the wrong axis (Current 0-700% instead of Torque 0-200%).</p>
+
+<h2>📝 Variable Naming Conventions</h2>
+
+<ul>
+<li><code>Pct</code> or <code>%</code> suffix → Percentage value (0-700 for current, 0-300 for torque typical)</li>
+<li><code>Nm</code> suffix → Absolute torque in Newton-meters</li>
+<li><code>Amps</code> or <code>A</code> suffix → Current in amperes</li>
+<li><code>RadS</code> suffix → Angular velocity in radians/second</li>
+<li><code>RPM</code> suffix → Rotational speed in revolutions/minute</li>
+<li><code>thermal</code> → Percentage of thermal capacity used</li>
+<li><code>thermalAbsRaw</code> → Absolute I²t value in A²·s</li>
+</ul>
+
+<h2>🎓 References</h2>
+<ul>
+<li>IEEE Std 112™: Standard Test Procedure for Polyphase Induction Motors</li>
+<li>NEMA MG 1: Motors and Generators</li>
+<li>Fritsch & Carlson (1980): Monotone Piecewise Cubic Interpolation</li>
+</ul>
+
+<a href="index.html" class="btn-back">← Back to Simulator</a>
+</div>
+</body>
+</html>
