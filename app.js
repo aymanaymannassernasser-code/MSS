@@ -237,14 +237,54 @@ function updateHeader() {
     document.getElementById('resSyncSpeed').innerText = ((120 * freq) / poles).toFixed(0);
 }
 
+function calculateOperatingLimits() {
+    const mRPM = parseFloat(document.getElementById('mRPM').value);
+    const freq = parseFloat(document.getElementById('mFreq').value) || 50;
+    const poles = parseFloat(document.getElementById('mPoles').value) || 4;
+    const serviceFactor = parseFloat(document.getElementById('serviceFactor')?.value) || 1.0;
+    const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
+    
+    const ns = (120 * freq) / poles;
+    const ratedSlip = (ns - mRPM) / ns;
+    const ratedSpeedPct = (mRPM / ns) * 100;
+    
+    // Upper limit: 99% (near synchronous)
+    const upperOperatingLimit = 99.0;
+    
+    // Lower limit: Speed where load = serviceFactor × 100%
+    const maxLoadPct = serviceFactor * 100;
+    let lowerOperatingLimit = ratedSpeedPct;
+    
+    // Find speed where load torque equals max load
+    for (let sp = 100; sp >= 0; sp -= 0.1) {
+        const loadAtSpeed = interpolate(sp, S_POINTS, tableLt);
+        if (loadAtSpeed >= maxLoadPct) {
+            lowerOperatingLimit = sp;
+            break;
+        }
+    }
+    
+    return {
+        ns,
+        ratedSlip,
+        ratedSpeedPct,
+        lowerOperatingLimit,
+        upperOperatingLimit,
+        maxLoadPct
+    };
+}
+
 function calculateMinStartingCurrent(tableMt, tableMc, tableLt) {
     // Find minimum current where net torque stays positive throughout curve
     // NO SAFETY MARGIN — returns actual physical minimum
+    const limits = calculateOperatingLimits();
+    
     for (let testCurrent = 200; testCurrent <= 700; testCurrent += 2) {
         let minNetTorque = 999, stallDetected = false, criticalSpeedPoint = 0;
         
         for (let i = 0; i < S_POINTS.length; i++) {
-            if (S_POINTS[i] >= 95) continue;
+            // Check up to lower operating limit (not hardcoded 95%)
+            if (S_POINTS[i] >= limits.lowerOperatingLimit) continue;
             let motorTorque = parseFloat(tableMt[i]);
             let motorCurrent = parseFloat(tableMc[i]);
             let loadTorque = parseFloat(tableLt[i]);
@@ -268,7 +308,7 @@ function calculateMinStartingCurrent(tableMt, tableMc, tableLt) {
     return { current: 700, criticalSpeed: 0 };
 }
 
-// CRITICAL FIX: Comprehensive stall detection
+// CRITICAL FIX: Comprehensive stall detection with proper operating region limits with proper operating region limits
 function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = false) {
     const mRPM = parseFloat(document.getElementById('mRPM').value);
     const mFLC = parseFloat(document.getElementById('mFLC').value);
@@ -283,14 +323,23 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
     
     const fltNm = parseFloat(document.getElementById('resFLT').innerText);
     const hStall = parseFloat(document.getElementById('hStall').value);
-    const freq = parseFloat(document.getElementById('mFreq').value) || 50;
-    const poles = parseFloat(document.getElementById('mPoles').value) || 4;
+    const maxStartTimeInput = document.getElementById('maxStartTime')?.value;
+    const maxStartTime = maxStartTimeInput && parseFloat(maxStartTimeInput) > 0 
+        ? parseFloat(maxStartTimeInput) 
+        : hStall; // Default to hot stall time
     
     const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);
     const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
     const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
     
-    const ns = (120 * freq) / poles;
+    // Calculate operating region limits
+    const limits = calculateOperatingLimits();
+    const { ns, ratedSlip, ratedSpeedPct, lowerOperatingLimit, upperOperatingLimit, maxLoadPct } = limits;
+    
+    console.log(`📊 Operating Region: ${lowerOperatingLimit.toFixed(1)}% to ${upperOperatingLimit.toFixed(1)}%`);
+    console.log(`  Rated: ${ratedSpeedPct.toFixed(1)}% (slip ${(ratedSlip*100).toFixed(2)}%)`);
+    console.log(`  Max Load: ${maxLoadPct.toFixed(0)}% @ ${lowerOperatingLimit.toFixed(1)}% speed`);
+    
     const targetRadS = (mRPM * 2 * Math.PI) / 60;
     const lockedRotorCurrentAmps = (parseFloat(tableMc[0]) / 100) * mFLC;
     
@@ -311,7 +360,7 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
     let lastSpeedCheck = 0;
     let lastSpeedValue = 0;
 
-    while (time < 60 && speedPerc < 99) {
+    while (time < 60 && speedPerc < upperOperatingLimit) {
         let motorTorquePct = interpolate(speedPerc, S_POINTS, tableMt);
         let motorCurrentPct = interpolate(speedPerc, S_POINTS, tableMc);
         let loadTorquePct = interpolate(speedPerc, S_POINTS, tableLt);
@@ -337,14 +386,22 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
         
         let netTorquePct = actualMotorTorquePct - loadTorquePct;
         
-        if (speedPerc < 95 && netTorquePct < minNet) {
+        // Track minimum net torque ONLY below operating region
+        if (speedPerc < lowerOperatingLimit && netTorquePct < minNet) {
             minNet = netTorquePct;
             criticalNetSpeed = speedPerc;
         }
         
-        // COMPREHENSIVE STALL DETECTION (applies throughout entire start, not just <98%)
+        // STALL DETECTION: Apply checks based on operating region
+        // Within operating region (lowerOperatingLimit to upperOperatingLimit):
+        //   - Motor and load can be equal → steady-state operation
+        //   - Only thermal overload applies
+        // Below operating region: All checks apply
+        
+        const inOperatingRegion = (speedPerc >= lowerOperatingLimit && speedPerc <= upperOperatingLimit);
+        
         if (!isStalled) {
-            // 1. NEGATIVE NET TORQUE (motor can't overcome load)
+            // 1. NEGATIVE NET TORQUE (always applies - motor physically can't overcome load)
             if (netTorquePct < 0) {
                 console.error(`🛑 STALL: Negative Net Torque at ${speedPerc.toFixed(1)}% speed`);
                 console.error(`  Motor Torque: ${actualMotorTorquePct.toFixed(1)}%`);
@@ -357,15 +414,15 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
                 break;
             }
             
-            // 2. CRITICALLY LOW NET TORQUE (< 0.5%, essentially stuck)
-            if (netTorquePct < 0.5 && speedPerc < 95) {
+            // 2. CRITICALLY LOW NET TORQUE (only below operating region)
+            if (!inOperatingRegion && netTorquePct < 0.5) {
                 isStalled = true;
                 stallReason = "Insufficient Torque (<0.5%)";
                 stallSpd = speedPerc;
                 break;
             }
             
-            // 3. THERMAL OVERLOAD
+            // 3. THERMAL OVERLOAD (always applies)
             if (thermal >= 100) {
                 isStalled = true;
                 stallReason = "Thermal Overload";
@@ -373,8 +430,8 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
                 break;
             }
             
-            // 4. HUNG (speed not progressing - check every 1.5 seconds)
-            if (time - lastSpeedCheck >= 1.5) {
+            // 4. HUNG (only below operating region)
+            if (!inOperatingRegion && time - lastSpeedCheck >= 1.5) {
                 if (Math.abs(speedPerc - lastSpeedValue) < 0.3 && time > 2.0) {
                     isStalled = true;
                     stallReason = "Hung (No Acceleration)";
@@ -385,19 +442,18 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
                 lastSpeedValue = speedPerc;
             }
             
-            // 5. CREEPING (very slow progress, insufficient current)
-            if (time > 20 && speedPerc < 50) {
+            // 5. CREEPING (only below operating region)
+            if (!inOperatingRegion && time > 20 && speedPerc < lowerOperatingLimit * 0.5) {
                 isStalled = true;
                 stallReason = "Too Slow (Creeping - Insufficient Current)";
                 stallSpd = speedPerc;
                 break;
             }
             
-            // 6. EXCESSIVE TIME (max 30s OR 2× hot stall, whichever is less)
-            const maxAllowedTime = Math.min(30, hStall * 2);
-            if (time > maxAllowedTime && speedPerc < 95) {
+            // 6. EXCESSIVE TIME (only below operating region)
+            if (!inOperatingRegion && time > maxStartTime) {
                 isStalled = true;
-                stallReason = `Timeout (>${maxAllowedTime.toFixed(0)}s)`;
+                stallReason = `Timeout (>${maxStartTime.toFixed(0)}s)`;
                 stallSpd = speedPerc;
                 break;
             }
@@ -405,8 +461,8 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
         
         if (isStalled) break;
         
-        // Physics continues ALL THE WAY to 99% (not 98.5%!)
-        if (speedPerc < 99) {
+        // Physics continues to upper operating limit
+        if (speedPerc < upperOperatingLimit) {
             // Physics: J × dω/dt = T_net
             let netTorqueNm = (netTorquePct / 100.0) * fltNm;
             let angularAccel = netTorqueNm / totalJ;
@@ -426,7 +482,8 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
         return {
             time, isStalled, stallReason, thermal, thermalAbs: thermalAbsRaw,
             minNet, criticalNetSpeed, finalSlip: 1 - (speedPerc / 100),
-            ns, stallSpd, rampEndSpeed
+            ns, stallSpd, rampEndSpeed, 
+            lowerOperatingLimit, upperOperatingLimit, ratedSpeedPct
         };
     }
     return { time, isStalled, stallReason };
@@ -489,7 +546,7 @@ function runSimulation() {
             }
             let vr = Math.min(1, currentAtThisSpeed / rc);
             ssMt.push(rm * vr * vr);
-            ssMc.push(currentAtThisSpeed);
+            ssMc.push(rc * vr); // ACTUAL current drawn, not the limit
         }
     });
     
@@ -660,25 +717,41 @@ function solveForCurrentFromTime(targetTime) {
     // Case 1: No ramp (initial == final OR ramp time == 0)
     // Find a SINGLE current that gives target time, set both fields to it
     if (ssInitialI === ssFinalI || ssRampTime === 0) {
-        let low = 200, high = 700, iterations = 0;
-        let bestCurrent = 0, bestTime = 999;
+        // First, check if target time is even achievable
+        let minCurrentTest = runSimulationCore('SS', 200, 200, 0, true);
+        let maxCurrentTest = runSimulationCore('SS', 700, 700, 0, true);
         
-        while (high - low > 5 && iterations < 25) {
+        if (!minCurrentTest.isStalled && minCurrentTest.time < targetTime) {
+            alert(`⚠️ IMPOSSIBLE TARGET TIME\n\nEven at minimum current (200%), motor starts in ${minCurrentTest.time.toFixed(2)}s.\n\nTarget: ${targetTime}s is too long!\n\nSuggestion: Use a RAMP to slow down the start.`);
+            return;
+        }
+        
+        if (maxCurrentTest.isStalled || maxCurrentTest.time > targetTime) {
+            alert(`⚠️ IMPOSSIBLE TARGET TIME\n\nEven at maximum current (700%), motor ${maxCurrentTest.isStalled ? 'stalls' : `takes ${maxCurrentTest.time.toFixed(2)}s`}.\n\nTarget: ${targetTime}s is too short!\n\nIncrease target time or check motor/load curves.`);
+            return;
+        }
+        
+        let low = 200, high = 700, iterations = 0;
+        let bestCurrent = 0, bestTimeDiff = 999;
+        
+        while (high - low > 2 && iterations < 30) {
             let mid = Math.floor((low + high) / 2);
             let result = runSimulationCore('SS', mid, mid, 0, true); // no ramp
             
-            console.log(`[No Ramp] Iteration ${iterations}: ${mid}% → ${result.time.toFixed(2)}s (target: ${targetTime}s)`);
+            const timeDiff = Math.abs(result.time - targetTime);
+            console.log(`[No Ramp] Iteration ${iterations}: ${mid}% → ${result.time.toFixed(2)}s (target: ${targetTime}s, diff: ${timeDiff.toFixed(2)}s)`);
+            
+            if (timeDiff < bestTimeDiff) {
+                bestCurrent = mid;
+                bestTimeDiff = timeDiff;
+            }
             
             if (result.isStalled) {
-                low = mid + 1;
+                low = mid + 1; // Stalled - need more current
             } else if (result.time > targetTime) {
-                low = mid + 1;
+                low = mid + 1; // Too slow - need more current
             } else {
-                high = mid - 1;
-                if (result.time < bestTime || bestCurrent === 0) {
-                    bestCurrent = mid;
-                    bestTime = result.time;
-                }
+                high = mid - 1; // Too fast - try less current
             }
             iterations++;
         }
@@ -690,25 +763,32 @@ function solveForCurrentFromTime(targetTime) {
             const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
             bestCurrent = minResult.current;
             alert(`⚠️ Could not find current for ${targetTime}s.\n\nUsing minimum: ${bestCurrent}%`);
+        } else {
+            console.log(`✓ Found single current: ${bestCurrent}% → time diff: ${bestTimeDiff.toFixed(2)}s`);
         }
         
         // Set BOTH fields to the same value (no ramp)
         document.getElementById('ssInitialI').value = bestCurrent;
         document.getElementById('ssFinalI').value = bestCurrent;
         document.getElementById('ssRampTime').value = 0;
-        console.log(`✓ Found single current: ${bestCurrent}% → ${bestTime.toFixed(2)}s`);
         
     } else {
         // Case 2: Ramping (initial != final AND ramp > 0)
         // Keep initial and ramp time fixed, find only the final current needed
         let low = Math.max(200, ssInitialI), high = 700, iterations = 0;
-        let bestFinalCurrent = 0, bestTime = 999;
+        let bestFinalCurrent = 0, bestTimeDiff = 999;
         
-        while (high - low > 5 && iterations < 25) {
+        while (high - low > 2 && iterations < 30) {
             let mid = Math.floor((low + high) / 2);
             let result = runSimulationCore('SS', ssInitialI, mid, ssRampTime, true);
             
-            console.log(`[Ramp] Iteration ${iterations}: ${ssInitialI}%→${mid}% (${ssRampTime}s ramp) → ${result.time.toFixed(2)}s (target: ${targetTime}s)`);
+            const timeDiff = Math.abs(result.time - targetTime);
+            console.log(`[Ramp] Iteration ${iterations}: ${ssInitialI}%→${mid}% (${ssRampTime}s ramp) → ${result.time.toFixed(2)}s (target: ${targetTime}s, diff: ${timeDiff.toFixed(2)}s)`);
+            
+            if (timeDiff < bestTimeDiff) {
+                bestFinalCurrent = mid;
+                bestTimeDiff = timeDiff;
+            }
             
             if (result.isStalled) {
                 low = mid + 1;
@@ -716,10 +796,6 @@ function solveForCurrentFromTime(targetTime) {
                 low = mid + 1;
             } else {
                 high = mid - 1;
-                if (result.time < bestTime || bestFinalCurrent === 0) {
-                    bestFinalCurrent = mid;
-                    bestTime = result.time;
-                }
             }
             iterations++;
         }
@@ -729,13 +805,14 @@ function solveForCurrentFromTime(targetTime) {
             const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
             const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
             const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
-            bestFinalCurrent = Math.max(minResult.current, ssInitialI + 50); // at least 50% above initial
+            bestFinalCurrent = Math.max(minResult.current, ssInitialI + 50);
             alert(`⚠️ Could not find final current for ${targetTime}s.\n\nTrying: ${bestFinalCurrent}%`);
+        } else {
+            console.log(`✓ Found: ${ssInitialI}%→${bestFinalCurrent}% (${ssRampTime}s ramp) → time diff: ${bestTimeDiff.toFixed(2)}s`);
         }
         
         // Update ONLY final current (initial and ramp stay as user set them)
         document.getElementById('ssFinalI').value = bestFinalCurrent;
-        console.log(`✓ Found: ${ssInitialI}%→${bestFinalCurrent}% (${ssRampTime}s ramp) → ${bestTime.toFixed(2)}s`);
     }
     
     runSimulation();

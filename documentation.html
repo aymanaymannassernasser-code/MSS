@@ -33,9 +33,35 @@ li{margin:0.5rem 0;color:#cbd5e1;}
 <p style="font-size:1.1rem;color:var(--mut);">Complete technical documentation of the Motor Starter Simulator physics engine</p>
 
 <h2>🎯 Core Physics Model</h2>
-<p>The simulator is built on fundamental electromechanical principles. Every calculation follows IEEE standards and real-world motor physics.</p>
+<p>The simulator is built on fundamental electromechanical principles with proper understanding of motor operating regions.</p>
 
-<h3>1. Fundamental Equations</h3>
+<h3>1. Operating Region Limits</h3>
+
+<div class="formula">
+<strong>Synchronous Speed:</strong><br>
+<code>n_sync = 120 × f / poles</code> (RPM)
+</div>
+
+<div class="formula">
+<strong>Rated Slip:</strong><br>
+<code>s_rated = (n_sync - n_rated) / n_sync</code><br>
+<code>speed_rated% = (n_rated / n_sync) × 100</code>
+</div>
+
+<div class="formula">
+<strong>Operating Region:</strong><br>
+• <strong>Upper Limit:</strong> 99% speed (near-synchronous, minimal slip)<br>
+• <strong>Lower Limit:</strong> Speed where load torque = serviceFactor × 100%<br>
+<br>
+Between these limits, motor and load torques can be equal → steady-state operation.<br>
+This is NORMAL, not a stall condition.
+</div>
+
+<p><strong>Service Factor:</strong> Multiplier for maximum continuous load. Default = 1.0 (100% rated load). Set to 1.15 if motor has 115% service factor rating.</p>
+
+<p><strong>Why This Matters:</strong> A motor running at 97% speed with 110% load is in its normal operating region if service factor ≥ 1.15. The simulator will NOT flag this as a stall.</p>
+
+<h3>2. Fundamental Equations</h3>
 
 <div class="formula">
 <strong>Newton's Second Law for Rotation:</strong><br>
@@ -96,58 +122,118 @@ loadTorque% = interpolate(speed%, S_POINTS, tableLt)</code></pre>
 </ul>
 
 <h2>🛑 Stall Detection Logic</h2>
-<p>The simulator checks 6 independent stall conditions on every time step:</p>
+<p>The simulator checks 6 independent stall conditions with intelligent operating region awareness:</p>
 
-<h3>1. Negative Net Torque</h3>
-<pre><code>if (motorTorque% - loadTorque% < 0) → STALL
-Reason: "Insufficient Torque (Negative)"</code></pre>
-<p><strong>Physical meaning:</strong> Load torque exceeds motor torque — motor physically cannot accelerate.</p>
-
-<h3>2. Critically Low Net Torque</h3>
-<pre><code>if (netTorque% < 0.5% AND speed < 95%) → STALL
-Reason: "Insufficient Torque (<0.5%)"</code></pre>
-<p><strong>Physical meaning:</strong> Net torque too small to overcome friction and accelerate meaningfully.</p>
-
-<h3>3. Thermal Overload</h3>
-<pre><code>if (thermal% ≥ 100%) → STALL
-Reason: "Thermal Overload"</code></pre>
-<p><strong>Physical meaning:</strong> Accumulated I²t exceeds motor thermal capacity — protection trips.</p>
-
-<h3>4. Hung Motor (No Acceleration)</h3>
-<pre><code>// Checked every 1.5 seconds:
-if (|Δspeed| < 0.3% over 1.5s AND time > 2s) → STALL
-Reason: "Hung (No Acceleration)"</code></pre>
-<p><strong>Physical meaning:</strong> Motor is running but not accelerating — indicates stall without numerical instability.</p>
-
-<h3>5. Creeping (Too Slow)</h3>
-<pre><code>if (time > 20s AND speed < 50%) → STALL
-Reason: "Too Slow (Creeping - Insufficient Current)"</code></pre>
-<p><strong>Physical meaning:</strong> Motor taking unreasonably long to reach 50% — insufficient starting current.</p>
-
-<h3>6. Timeout</h3>
-<pre><code>maxTime = min(30s, 2 × t_hotstall)
-if (time > maxTime AND speed < 95%) → STALL
-Reason: "Timeout (>Xs)"</code></pre>
-<p><strong>Physical meaning:</strong> Excessive starting time — likely to cause thermal damage or utility voltage dip complaints.</p>
-
-<div class="warning">
-<strong>⚠️ Critical:</strong> All 6 checks apply throughout the ENTIRE start (0-99% speed). They are NOT disabled at high speeds.
+<div class="formula">
+<strong>Operating Region Concept:</strong><br>
+Within the operating region (lowerLimit to 99%), motor and load torques can be equal → steady-state operation.<br>
+Below the operating region: motor is accelerating → all stall checks apply.<br>
+Above the operating region: near-synchronous → only thermal applies.
 </div>
 
-<h2>🔄 Soft Start Ramping</h2>
+<h3>1. Negative Net Torque (Always Applies)</h3>
+<pre><code>if (motorTorque% - loadTorque% < 0) → STALL
+Reason: "Insufficient Torque (Negative)"</code></pre>
+<p><strong>Physical meaning:</strong> Load torque exceeds motor torque — motor physically cannot accelerate. This is checked at ALL speeds.</p>
+
+<h3>2. Critically Low Net Torque (Below Operating Region Only)</h3>
+<pre><code>if (netTorque% < 0.5% AND speed < lowerOperatingLimit) → STALL
+Reason: "Insufficient Torque (<0.5%)"</code></pre>
+<p><strong>Physical meaning:</strong> Net torque too small to overcome friction. Only checked during acceleration phase, NOT in operating region.</p>
+
+<h3>3. Thermal Overload (Always Applies)</h3>
+<pre><code>if (thermal% ≥ 100%) → STALL
+Reason: "Thermal Overload"</code></pre>
+<p><strong>Physical meaning:</strong> Accumulated I²t exceeds motor thermal capacity — protection trips at ANY speed.</p>
+
+<h3>4. Hung Motor (Below Operating Region Only)</h3>
+<pre><code>// Checked every 1.5 seconds:
+if (|Δspeed| < 0.3% over 1.5s AND time > 2s AND speed < lowerOperatingLimit) → STALL
+Reason: "Hung (No Acceleration)"</code></pre>
+<p><strong>Physical meaning:</strong> Motor is running but not accelerating during start-up phase.</p>
+
+<h3>5. Creeping (Below Operating Region Only)</h3>
+<pre><code>if (time > 20s AND speed < lowerOperatingLimit × 0.5) → STALL
+Reason: "Too Slow (Creeping - Insufficient Current)"</code></pre>
+<p><strong>Physical meaning:</strong> Motor taking too long to reach halfway to operating region — insufficient starting current.</p>
+
+<h3>6. Timeout (Below Operating Region Only)</h3>
+<pre><code>maxTime = user-specified (default = t_hotstall)
+if (time > maxTime AND speed < lowerOperatingLimit) → STALL
+Reason: "Timeout (>Xs)"</code></pre>
+<p><strong>Physical meaning:</strong> Excessive starting time. User sets maximum via "Max Start Time" field (defaults to Hot Stall time).</p>
+
+<div class="warning">
+<strong>⚠️ Key Insight:</strong> Most stall checks are disabled WITHIN the operating region because motor-load equilibrium is normal there. Only negative torque and thermal overload can occur in steady-state.
+</div>
+
+<h2>🔄 Soft Start Voltage Ramping</h2>
 
 <h3>Current Limit Calculation</h3>
 <pre><code>if (time ≤ rampTime):
     currentLimit% = initial% + (final% - initial%) × (time / rampTime)
 else:
     currentLimit% = final%</code></pre>
+<p>The current limit ramps <strong>linearly</strong> from initial to final percentage over the ramp time.</p>
 
-<h3>Torque Reduction</h3>
+<h3>Voltage & Torque Reduction</h3>
 <pre><code>voltageRatio = min(1.0, currentLimit / motorCurrentAtSpeed)
 actualMotorTorque = fullVoltageTorque × voltageRatio²
 actualMotorCurrent = fullVoltageCurrent × voltageRatio</code></pre>
 
-<p><strong>Why squared?</strong> Because torque depends on flux × current, and both are proportional to voltage in an induction motor. Thus <code>T ∝ V² ∝ I²</code>.</p>
+<h3>Why Torque ∝ Voltage²?</h3>
+<p>In an induction motor at constant frequency:</p>
+<ul>
+<li><code>Torque = k × Flux × Current</code></li>
+<li><code>Flux ∝ Voltage</code></li>
+<li><code>Current ∝ Voltage</code> (for given slip)</li>
+<li>Therefore: <code>Torque ∝ V × V = V²</code></li>
+</ul>
+<p>This is the IEEE standard approximation for soft-start analysis.</p>
+
+<h3>Real-World Soft Starters vs. Our Model</h3>
+
+<h4>Real Soft Starters (SCR/Thyristor Control):</h4>
+<ul>
+<li>Control firing angle α (when SCR triggers in each half-cycle)</li>
+<li>RMS Voltage: <code>V_rms = V_rated × sqrt((π - α + 0.5×sin(2α)) / π)</code></li>
+<li>Voltage ramps <strong>non-linearly</strong> with α</li>
+<li>Generate significant harmonics (5th, 7th, 11th, 13th...)</li>
+<li>Power factor degrades during start</li>
+</ul>
+
+<h4>Our Model (Current-Limiting Approach):</h4>
+<ul>
+<li>Control current limit percentage</li>
+<li>Voltage ratio = currentLimit / fullVoltageCurrent</li>
+<li>Voltage ramps <strong>linearly</strong> (approximately)</li>
+<li>Harmonics NOT modeled</li>
+<li>Power factor NOT modeled</li>
+</ul>
+
+<div class="formula">
+<strong>Why Our Approach Works:</strong><br>
+For starting performance analysis (time, current, thermal, stalls), current-limiting gives nearly identical results to firing-angle control because:<br>
+1. Both reduce effective voltage<br>
+2. Both reduce torque by V²<br>
+3. The I²t thermal integral is the same<br>
+4. The acceleration physics (J×dω/dt = T_net) is unchanged<br>
+5. Harmonics don't affect starting torque or time<br>
+<br>
+The main difference is harmonic content, which doesn't affect the key outputs users need.
+</div>
+
+<h3>Example</h3>
+<p>Motor at 0% speed: Full-voltage current = 600%</p>
+<p>Soft start: Initial 300%, Final 450%, Ramp 2s</p>
+
+<table style="width:100%;border-collapse:collapse;margin:1rem 0;">
+<tr style="background:#1e2535;"><th style="padding:8px;border:1px solid #2e3545;">Time</th><th style="padding:8px;border:1px solid #2e3545;">Current Limit</th><th style="padding:8px;border:1px solid #2e3545;">Voltage Ratio</th><th style="padding:8px;border:1px solid #2e3545;">Torque %</th></tr>
+<tr><td style="padding:8px;border:1px solid #2e3545;">0s</td><td style="padding:8px;border:1px solid #2e3545;">300%</td><td style="padding:8px;border:1px solid #2e3545;">300/600 = 0.5</td><td style="padding:8px;border:1px solid #2e3545;">0.5² = 25% of full</td></tr>
+<tr><td style="padding:8px;border:1px solid #2e3545;">1s</td><td style="padding:8px;border:1px solid #2e3545;">375%</td><td style="padding:8px;border:1px solid #2e3545;">375/600 = 0.625</td><td style="padding:8px;border:1px solid #2e3545;">0.625² = 39% of full</td></tr>
+<tr><td style="padding:8px;border:1px solid #2e3545;">2s</td><td style="padding:8px;border:1px solid #2e3545;">450%</td><td style="padding:8px;border:1px solid #2e3545;">450/600 = 0.75</td><td style="padding:8px;border:1px solid #2e3545;">0.75² = 56% of full</td></tr>
+<tr><td style="padding:8px;border:1px solid #2e3545;">>2s</td><td style="padding:8px;border:1px solid #2e3545;">450%</td><td style="padding:8px;border:1px solid #2e3545;">0.75</td><td style="padding:8px;border:1px solid #2e3545;">56% of full (constant)</td></tr>
+</table>
 
 <h2>📊 Minimum Starting Current</h2>
 
@@ -178,6 +264,19 @@ binarySearch(initial% to 700%):
         return final
 // Update only final current</code></pre>
 
+<h3>How to Use</h3>
+<p>In Soft Start mode, click the START TIME result, type your target time (e.g., "5"), and press Enter. The solver automatically finds the current that achieves that time.</p>
+
+<h3>Limitations & Validation</h3>
+<div class="warning">
+<strong>Target Time Too Long:</strong><br>
+If even at minimum current (200%) the motor starts faster than your target time, it's physically impossible. The solver alerts you.<br><br>
+<strong>Solution:</strong> Use a RAMP to slow down. Example: Motor starts in 1.9s at 200% but you want 5s? Set Initial 250%, Final 350%, Ramp 3s.<br><br>
+<strong>Target Time Too Short:</strong><br>
+If even at maximum current (700%) the motor stalls or takes longer, the target is impossible.<br><br>
+<strong>Solution:</strong> Increase target time or verify motor/load curves are correct.
+</div>
+
 <h2>📈 Chart Rendering</h2>
 
 <h3>Data Generation</h3>
@@ -188,10 +287,17 @@ for speed = 0 to 100 step 0.2:
     loadTorque[i] = interpolate(speed, S_POINTS, tableLt)
     
     if (Soft Start mode):
-        currentAtThisSpeed = calculate from ramp profile
-        voltageRatio = min(1, currentAtThisSpeed / dolMotorCurrent[i])
+        currentLimit = calculate from ramp profile
+        voltageRatio = min(1, currentLimit / dolMotorCurrent[i])
         ssMotorTorque[i] = dolMotorTorque[i] × voltageRatio²
-        ssMotorCurrent[i] = currentAtThisSpeed</code></pre>
+        ssMotorCurrent[i] = dolMotorCurrent[i] × voltageRatio  // ACTUAL current drawn</code></pre>
+
+<div class="formula">
+<strong>Important:</strong> The chart plots ACTUAL current drawn, not the current limit.<br><br>
+Example: If limit is 450% but motor only needs 300% at 90% speed, the chart shows 300%.<br>
+As the motor accelerates, natural current decreases per the curve, so the chart will show decreasing current even with a fixed limit.<br><br>
+This matches real-world behavior where soft starters limit maximum current but don't force the motor to draw that much.
+</div>
 
 <h3>Axis Configuration</h3>
 <p><strong>Default (axesSwapped = false):</strong></p>
