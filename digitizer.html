@@ -169,8 +169,8 @@ header{background:#000;border-bottom:2px solid var(--acc);display:flex;
   <!-- STEP 3 -->
   <div class="panel" id="s3">
     <div class="stitle">✏️ Trace Curves</div>
-    <div class="info lock" style="margin-bottom:11px;">
-      🔒 Grid is <strong>locked</strong>. Select curve then drag finger along it. Motor Current uses right Y axis.
+    <div class="info lock" id="step3Info" style="margin-bottom:11px;">
+      🔒 Grid is <strong>locked</strong>. Select curve then drag finger along it.
     </div>
     <div class="cbtns" id="curveBtns">
       <button class="cbtn mt sel" id="bMT" onclick="setCurve('mt')">
@@ -210,15 +210,15 @@ header{background:#000;border-bottom:2px solid var(--acc);display:flex;
     <div class="cbtns" style="margin-bottom:10px;">
       <button class="cbtn mt sel" id="rMT" onclick="setRefine('mt')">
         <span class="dot" style="background:var(--acc)"></span>Motor Torque
-        <span class="cnt" style="color:var(--acc)" id="axLabelMT">Left Y</span>
+        <span class="cnt" style="color:var(--acc)" id="axLabelMT">Right Y</span>
       </button>
       <button class="cbtn mc" id="rMC" onclick="setRefine('mc')">
         <span class="dot" style="background:var(--yel)"></span>Motor Current
-        <span class="cnt" style="color:var(--yel)" id="axLabelMC">Right Y</span>
+        <span class="cnt" style="color:var(--yel)" id="axLabelMC">Left Y</span>
       </button>
       <button class="cbtn lt" id="rLT" onclick="setRefine('lt')">
         <span class="dot" style="background:var(--red)"></span>Load Torque
-        <span class="cnt" style="color:var(--red)" id="axLabelLT">Left Y</span>
+        <span class="cnt" style="color:var(--red)" id="axLabelLT">Right Y</span>
       </button>
     </div>
     <button class="abtn a-back" onclick="goStep(3)">← Re-trace</button>
@@ -358,8 +358,22 @@ window.addEventListener('resize',()=>{if(ST.img)fitCanvas();});
 // ═══════════════════════════════════════════════════
 function lockGrid(){
   boxLocked=true;
+  updateStep3Info();
   showToast('🔒 Grid locked — now trace your curves!');
   goStep(3);
+}
+function updateStep3Info(){
+  const leftLabel = document.getElementById('leftYLabel').textContent;
+  const rightLabel = document.getElementById('rightYLabel').textContent;
+  const info = document.getElementById('step3Info');
+  if(info){
+    info.innerHTML = `🔒 Grid is <strong>locked</strong>. Select curve then drag finger along it.<br>
+      <span style="font-size:0.7rem;margin-top:4px;display:block;color:var(--mut);">
+        • Left axis: ${leftLabel}<br>
+        • Right axis: ${rightLabel}<br>
+        Check curve badges to verify axis assignment!
+      </span>`;
+  }
 }
 function resetGrid(){
   boxLocked=false;
@@ -375,7 +389,8 @@ function toggleAxis(e, curve){
   e.stopPropagation();
   axisMap[curve] = axisMap[curve]==='left'?'right':'left';
   updateAxisBadges();
-  redraw(); // ctrl points are in data space — no recompute needed
+  if(ST.step === 3) updateStep3Info();
+  redraw();
 }
 function swapAllAxes(){
   // Toggle all curves between left/right at once
@@ -429,6 +444,7 @@ function swapAllAxes(){
   }
   
   redraw();
+  if(ST.step === 3) updateStep3Info(); // Update info if already on step 3
   showToast('⇄ Swapped all axes: Input fields updated!');
 }
 function updateAxisBadges(){
@@ -542,6 +558,7 @@ function doExtract(){
     if(ctrls){ST.ctrl[c]=ctrls;count++;}
   });
   if(count===0){showToast('⚠️ Trace at least one curve!');return;}
+  updateAxisBadges(); // Ensure step 4 labels match current axis assignments
   showToast(`✅ ${count} curve(s) extracted — drag points to refine!`);
   goStep(4);
 }
@@ -599,6 +616,23 @@ function buildTable(){
 
 function applyData(){
   if(!ST._vals){buildTable();return;}
+  
+  // Validate load torque values - catch axis assignment errors
+  if(ST._vals.lt && ST._vals.lt.length > 0){
+    const maxLT = Math.max(...ST._vals.lt);
+    if(maxLT > 150){
+      const confirmApply = confirm(
+        `⚠️ UNUSUAL LOAD TORQUE DETECTED\n\n` +
+        `Maximum load torque: ${maxLT}%\n\n` +
+        `This is abnormally high! Most loads stay below 150%.\n\n` +
+        `Possible cause: Load Torque was traced on the CURRENT axis (0-700%) instead of TORQUE axis (0-200%).\n\n` +
+        `Solution: Click Cancel, then toggle the Load Torque axis badge to use the correct scale, re-trace, and try again.\n\n` +
+        `Click OK only if you're certain this is correct.`
+      );
+      if(!confirmApply) return;
+    }
+  }
+  
   localStorage.setItem('digitizerData',JSON.stringify(ST._vals));
   showToast('✅ Applied! Returning to simulator...');
   setTimeout(()=>window.location.href='index.html',900);

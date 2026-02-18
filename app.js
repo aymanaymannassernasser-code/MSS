@@ -649,45 +649,90 @@ function renderChart(labels, dolMt, dolMc, ssMt, ssMc, pLt, stallSpd, criticalSp
 
 function solveForCurrentFromTime(targetTime) {
     const ssInitialI = parseFloat(document.getElementById('ssInitialI').value) || 300;
+    const ssFinalI = parseFloat(document.getElementById('ssFinalI').value) || 300;
     const ssRampTime = parseFloat(document.getElementById('ssRampTime').value) || 0;
-    let low = 200, high = 700, iterations = 0;
-    let bestFinalCurrent = 0, bestTime = 999;
     
-    // Binary search for FINAL current that gives target time (initial + ramp stay fixed)
-    while (high - low > 5 && iterations < 25) {
-        let mid = Math.floor((low + high) / 2);
-        // Test with fixed initial, varying final
-        let result = runSimulationCore('SS', ssInitialI, mid, ssRampTime, true);
+    // Case 1: No ramp (initial == final OR ramp time == 0)
+    // Find a SINGLE current that gives target time, set both fields to it
+    if (ssInitialI === ssFinalI || ssRampTime === 0) {
+        let low = 200, high = 700, iterations = 0;
+        let bestCurrent = 0, bestTime = 999;
         
-        console.log(`Iteration ${iterations}: Initial ${ssInitialI}%, Final ${mid}%, Ramp ${ssRampTime}s → ${result.time.toFixed(1)}s (target: ${targetTime}s)`);
-        
-        if (result.isStalled) {
-            low = mid + 1;
-        } else if (result.time > targetTime) {
-            low = mid + 1;
-        } else {
-            high = mid - 1;
-            if (result.time < bestTime || bestFinalCurrent === 0) {
-                bestFinalCurrent = mid;
-                bestTime = result.time;
+        while (high - low > 5 && iterations < 25) {
+            let mid = Math.floor((low + high) / 2);
+            let result = runSimulationCore('SS', mid, mid, 0, true); // no ramp
+            
+            console.log(`[No Ramp] Iteration ${iterations}: ${mid}% → ${result.time.toFixed(2)}s (target: ${targetTime}s)`);
+            
+            if (result.isStalled) {
+                low = mid + 1;
+            } else if (result.time > targetTime) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+                if (result.time < bestTime || bestCurrent === 0) {
+                    bestCurrent = mid;
+                    bestTime = result.time;
+                }
             }
+            iterations++;
         }
-        iterations++;
-    }
-    
-    if (bestFinalCurrent === 0) {
-        const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);
-        const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
-        const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
-        const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
-        bestFinalCurrent = minResult.current;
-        alert(`⚠️ Could not find final current for ${targetTime}s.\n\nUsing minimum: ${bestFinalCurrent}%`);
+        
+        if (bestCurrent === 0) {
+            const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);
+            const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
+            const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
+            const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
+            bestCurrent = minResult.current;
+            alert(`⚠️ Could not find current for ${targetTime}s.\n\nUsing minimum: ${bestCurrent}%`);
+        }
+        
+        // Set BOTH fields to the same value (no ramp)
+        document.getElementById('ssInitialI').value = bestCurrent;
+        document.getElementById('ssFinalI').value = bestCurrent;
+        document.getElementById('ssRampTime').value = 0;
+        console.log(`✓ Found single current: ${bestCurrent}% → ${bestTime.toFixed(2)}s`);
+        
     } else {
-        console.log(`✓ Found: Initial ${ssInitialI}%, Final ${bestFinalCurrent}% → ${bestTime.toFixed(2)}s`);
+        // Case 2: Ramping (initial != final AND ramp > 0)
+        // Keep initial and ramp time fixed, find only the final current needed
+        let low = Math.max(200, ssInitialI), high = 700, iterations = 0;
+        let bestFinalCurrent = 0, bestTime = 999;
+        
+        while (high - low > 5 && iterations < 25) {
+            let mid = Math.floor((low + high) / 2);
+            let result = runSimulationCore('SS', ssInitialI, mid, ssRampTime, true);
+            
+            console.log(`[Ramp] Iteration ${iterations}: ${ssInitialI}%→${mid}% (${ssRampTime}s ramp) → ${result.time.toFixed(2)}s (target: ${targetTime}s)`);
+            
+            if (result.isStalled) {
+                low = mid + 1;
+            } else if (result.time > targetTime) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+                if (result.time < bestTime || bestFinalCurrent === 0) {
+                    bestFinalCurrent = mid;
+                    bestTime = result.time;
+                }
+            }
+            iterations++;
+        }
+        
+        if (bestFinalCurrent === 0) {
+            const tableMt = [...document.querySelectorAll('.val-mt')].map(e => e.value);
+            const tableMc = [...document.querySelectorAll('.val-mc')].map(e => e.value);
+            const tableLt = [...document.querySelectorAll('.val-lt')].map(e => e.value);
+            const minResult = calculateMinStartingCurrent(tableMt, tableMc, tableLt);
+            bestFinalCurrent = Math.max(minResult.current, ssInitialI + 50); // at least 50% above initial
+            alert(`⚠️ Could not find final current for ${targetTime}s.\n\nTrying: ${bestFinalCurrent}%`);
+        }
+        
+        // Update ONLY final current (initial and ramp stay as user set them)
+        document.getElementById('ssFinalI').value = bestFinalCurrent;
+        console.log(`✓ Found: ${ssInitialI}%→${bestFinalCurrent}% (${ssRampTime}s ramp) → ${bestTime.toFixed(2)}s`);
     }
     
-    // ONLY update final current field (preserve initial + ramp)
-    document.getElementById('ssFinalI').value = bestFinalCurrent;
     runSimulation();
 }
 
