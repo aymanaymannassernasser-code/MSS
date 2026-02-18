@@ -521,14 +521,19 @@ function runSimulation() {
     let lbls = Array.from({length: 501}, (_, i) => i * 0.2);
     let dolMt = [], dolMc = [], pLt = [], ssMt = [], ssMc = [];
     
+    // Get system voltage for chart curves
+    const systemVoltage = parseFloat(document.getElementById('systemVoltage')?.value) || 100;
+    const vRatio = systemVoltage / 100.0;
+    
     lbls.forEach(s => {
         let rm = interpolate(s, S_POINTS, tableMt);
         let rc = interpolate(s, S_POINTS, tableMc);
         let rl = interpolate(s, S_POINTS, tableLt);
         
-        dolMt.push(rm);
-        dolMc.push(rc);
-        pLt.push(rl);
+        // Apply system voltage to DOL curves (table values are at rated voltage)
+        dolMt.push(rm * vRatio * vRatio); // Motor Torque ∝ V²
+        dolMc.push(rc * vRatio); // Motor Current ∝ V
+        pLt.push(rl); // Load Torque unchanged (mechanical characteristic)
         
         if (simulationMode === 'SS') {
             let currentAtThisSpeed;
@@ -537,9 +542,10 @@ function runSimulation() {
             } else {
                 currentAtThisSpeed = ssFinalI;
             }
-            let vr = Math.min(1, currentAtThisSpeed / rc);
-            ssMt.push(rm * vr * vr);
-            ssMc.push(rc * vr); // ACTUAL current drawn, not the limit
+            // Soft start applies to already-reduced voltage curves
+            let vr = Math.min(1, currentAtThisSpeed / (rc * vRatio));
+            ssMt.push((rm * vRatio * vRatio) * vr * vr);
+            ssMc.push((rc * vRatio) * vr); // ACTUAL current drawn
         }
     });
     

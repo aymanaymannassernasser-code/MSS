@@ -7,13 +7,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0c10;--panel:#111318;--border:#1e2535;--acc:#22d3ee;
-  --grn:#10b981;--yel:#fbbf24;--red:#f43f5e;--pur:#a855f7;--mut:#64748b;}
+  --grn:#10b981;--yel:#fbbf24;--red:#f43f5e;--pur:#a855f7;--mut:#64748b;--text-primary:#e2e8f0;}
+[data-theme="light"]{--bg:#f8fafc;--panel:#ffffff;--border:#cbd5e1;--acc:#0891b2;
+  --grn:#059669;--yel:#d97706;--red:#dc2626;--pur:#9333ea;--mut:#64748b;--text-primary:#0f172a;}
+.theme-toggle{background:var(--panel);border:2px solid var(--border);border-radius:8px;
+  padding:6px 10px;cursor:pointer;font-size:1.1rem;transition:all 0.3s;margin-right:10px;line-height:1;}
+.theme-toggle:hover{border-color:var(--acc);transform:scale(1.1);}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:var(--bg);color:#e2e8f0;font-family:'Rajdhani',sans-serif;
+body{background:var(--bg);color:var(--text-primary);font-family:'Rajdhani',sans-serif;
   display:grid;grid-template-rows:54px 1fr;height:100vh;overflow:hidden;}
-header{background:#000;border-bottom:2px solid var(--acc);display:flex;
+header{background:var(--panel);border-bottom:2px solid var(--acc);display:flex;
   align-items:center;justify-content:space-between;padding:0 20px;}
-.htitle{font-size:1.25rem;font-weight:700;color:#fff;letter-spacing:1px;text-transform:uppercase;}
+.htitle{font-size:1.25rem;font-weight:700;color:var(--text-primary);letter-spacing:1px;text-transform:uppercase;}
 .hsub{font-size:.7rem;color:var(--mut);font-family:'JetBrains Mono',monospace;}
 .btn-hdr{background:none;border:1px solid var(--border);color:var(--mut);padding:7px 14px;
   border-radius:6px;cursor:pointer;font-family:'Rajdhani';font-size:.85rem;font-weight:600;transition:all .2s;}
