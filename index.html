@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="theme.js"></script>
 </head>
 <body>
     <header>
@@ -23,9 +25,10 @@
                 <div class="signature">By: Ayman Elkhodary</div>
             </div>
             <div class="header-right">
-                <a href="documentation.html" class="btn-notes" target="_blank">❓ How This Works?</a>
-                <a href="digitizer.html" class="btn-digitize">📐 Digitize Curves</a>
-                <button id="btnExportPDF" class="btn-pdf">💾 Save to PDF</button>
+                <button id="themeToggle" class="theme-toggle no-print" onclick="toggleTheme()" title="Toggle Theme">☀️</button>
+                <a href="documentation.html" class="btn-notes no-print" target="_blank">❓ How This Works</a>
+                <a href="digitizer.html" class="btn-digitize no-print">📐 Digitize Curves</a>
+                <button id="btnExportPDF" class="btn-pdf no-print">💾 Save to PDF</button>
             </div>
         </div>
     </header>
@@ -59,6 +62,7 @@
                     <div class="f-group"><label>Hot Stall (s)</label><input type="number" id="hStall" value="15"></div>
                     <div class="f-group"><label>Service Factor</label><input type="number" id="serviceFactor" value="1.0" step="0.05" title="Max continuous load (1.0=100%, 1.15=115%)"></div>
                     <div class="f-group"><label>Max Start (s)</label><input type="number" id="maxStartTime" value="" placeholder="Auto" title="Max allowed start time (blank = Hot Stall)"></div>
+                    <div class="f-group"><label>System Voltage (%)</label><input type="number" id="systemVoltage" value="100" min="50" max="110" step="1" title="Actual voltage as % of rated (85% = permanent voltage drop)"></div>
                 </div>
                 
                 <div class="inertia-section mt-15">
@@ -152,10 +156,6 @@
         <article class="results">
             <section class="card">
                 <h3>📈 Results</h3>
-                <div class="interpolation-toggle">
-                    <span>Method: <span id="interpolationMethod">Cubic Spline</span></span>
-                    <button id="splineToggle" class="btn-toggle">Cubic ✓</button>
-                </div>
                 <div class="results-grid">
                     <div class="result-item">
                         <span class="result-label">Start Time</span>

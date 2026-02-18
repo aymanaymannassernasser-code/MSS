@@ -6,9 +6,12 @@
 <title>How This Works — Motor Starter Simulator Documentation</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0b0e;--panel:#111318;--border:#1e2535;--acc:#22d3ee;--grn:#10b981;--red:#f43f5e;--yel:#fbbf24;--mut:#64748b;}
+:root{--bg:#0a0b0e;--panel:#111318;--border:#1e2535;--acc:#22d3ee;--grn:#10b981;--red:#f43f5e;--yel:#fbbf24;--mut:#64748b;--text-primary:#e2e8f0;}
+[data-theme="light"]{--bg:#f8fafc;--panel:#ffffff;--border:#cbd5e1;--acc:#0891b2;--grn:#059669;--red:#dc2626;--yel:#d97706;--mut:#64748b;--text-primary:#0f172a;}
+.theme-toggle{position:fixed;top:20px;right:20px;background:var(--panel);border:2px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:1.4rem;z-index:1000;transition:all 0.3s;}
+.theme-toggle:hover{border-color:var(--acc);transform:scale(1.1);}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:#e2e8f0;font-family:'Inter',sans-serif;line-height:1.7;padding:40px 20px;}
+body{background:var(--bg);color:var(--text-primary);font-family:'Inter',sans-serif;line-height:1.7;padding:40px 20px;}
 .container{max-width:900px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:40px;}
 h1{font-size:2.5rem;font-weight:800;color:#fff;margin-bottom:1rem;letter-spacing:-0.5px;}
 h2{font-size:1.8rem;font-weight:700;color:var(--acc);margin:2.5rem 0 1rem;border-bottom:2px solid var(--border);padding-bottom:0.5rem;}
@@ -28,6 +31,7 @@ li{margin:0.5rem 0;color:#cbd5e1;}
 </style>
 </head>
 <body>
+<button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">☀️</button>
 <div class="container">
 <h1>⚙️ How This Works</h1>
 <p style="font-size:1.1rem;color:var(--mut);">Complete technical documentation of the Motor Starter Simulator physics engine</p>
@@ -430,5 +434,6 @@ return: time, thermal%, minNetTorque%, finalSlip</code></pre>
 
 <a href="index.html" class="btn-back">← Back to Simulator</a>
 </div>
+<script src="theme.js"></script>
 </body>
 </html>

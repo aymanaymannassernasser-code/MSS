@@ -30,7 +30,6 @@ let axesSwapped = false; // false = Current left / Torque right (NEW DEFAULT)
 let thermalMode = 'percent';
 let simulationMode = 'DOL';
 let lastSimResults = null;
-let useSpline = true;
 
 // LINEAR interpolation
 function interpolateLinear(x, xArr, yArr) {
@@ -107,16 +106,13 @@ function evaluateMonotonicSpline(spline, x) {
 }
 
 function interpolate(x, xArr, yArr) {
-    if (useSpline) {
-        const key = yArr.join(',');
-        if (!window.splineCache) window.splineCache = {};
-        if (!window.splineCache[key]) {
-            window.splineCache[key] = createMonotonicSpline(xArr, yArr);
-        }
-        return evaluateMonotonicSpline(window.splineCache[key], x);
-    } else {
-        return interpolateLinear(x, xArr, yArr);
+    // Always use monotonic cubic spline for smooth, physically realistic curves
+    const key = yArr.join(',');
+    if (!window.splineCache) window.splineCache = {};
+    if (!window.splineCache[key]) {
+        window.splineCache[key] = createMonotonicSpline(xArr, yArr);
     }
+    return evaluateMonotonicSpline(window.splineCache[key], x);
 }
 
 function init() {
@@ -158,7 +154,6 @@ function init() {
     document.getElementById('btnExportPDF').onclick = exportToPDF;
     document.getElementById('caseDropdown').onchange = loadCase;
     document.getElementById('thermalToggle')?.addEventListener('click', toggleThermal);
-    document.getElementById('splineToggle')?.addEventListener('click', toggleSpline);
     document.getElementById('resultTime')?.addEventListener('blur', onStartTimeEdit);
     document.getElementById('resultTime')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') onStartTimeEdit();
@@ -175,14 +170,6 @@ function init() {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
     }
-}
-
-function toggleSpline() {
-    useSpline = !useSpline;
-    window.splineCache = {};
-    const btn = document.getElementById('splineToggle');
-    if (btn) btn.textContent = useSpline ? 'Cubic ✓' : 'Linear ✓';
-    document.getElementById('interpolationMethod').innerText = useSpline ? 'Cubic Spline' : 'Linear';
 }
 
 function onStartTimeEdit() {
@@ -365,6 +352,12 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
         let motorCurrentPct = interpolate(speedPerc, S_POINTS, tableMc);
         let loadTorquePct = interpolate(speedPerc, S_POINTS, tableLt);
         
+        // Apply system voltage (affects both DOL and SS modes)
+        const systemVoltage = parseFloat(document.getElementById('systemVoltage')?.value) || 100;
+        const voltageRatioSystem = systemVoltage / 100.0;
+        motorTorquePct *= voltageRatioSystem * voltageRatioSystem; // Torque ∝ V²
+        motorCurrentPct *= voltageRatioSystem; // Current ∝ V
+        
         let actualMotorTorquePct = motorTorquePct;
         let actualMotorCurrentPct = motorCurrentPct;
         
@@ -379,9 +372,9 @@ function runSimulationCore(mode, ssInitialI, ssFinalI, ssRampTime, returnData = 
                 currentLimit = ssFinalI;
             }
             // CORRECT: V ∝ I (linear), then T ∝ V² ∝ I²
-            let voltageRatio = Math.min(1.0, currentLimit / motorCurrentPct);
-            actualMotorTorquePct = motorTorquePct * voltageRatio * voltageRatio;
-            actualMotorCurrentPct = motorCurrentPct * voltageRatio;
+            let voltageRatioSS = Math.min(1.0, currentLimit / motorCurrentPct);
+            actualMotorTorquePct = motorTorquePct * voltageRatioSS * voltageRatioSS;
+            actualMotorCurrentPct = motorCurrentPct * voltageRatioSS;
         }
         
         let netTorquePct = actualMotorTorquePct - loadTorquePct;
@@ -846,10 +839,56 @@ function showImportBanner(count) {
     setTimeout(() => banner.remove(), 4000);
 }
 
-function exportToPDF() {
+async function exportToPDF() {
+    // Generate motor config data URL for QR code
+    const motorData = {
+        kw: document.getElementById('mKW').value,
+        flc: document.getElementById('mFLC').value,
+        rpm: document.getElementById('mRPM').value,
+        poles: document.getElementById('mPoles').value,
+        freq: document.getElementById('mFreq').value,
+        stall: document.getElementById('hStall').value,
+        serviceFactor: document.getElementById('serviceFactor')?.value || 1.0,
+        systemVoltage: document.getElementById('systemVoltage')?.value || 100,
+        motorJ: document.getElementById('motorJ').value,
+        loadJ: document.getElementById('loadJ').value
+    };
+    
+    // Create data URL - app can parse this to import motor config
+    const dataUrl = `motorstarter://import?` + new URLSearchParams(motorData).toString();
+    
+    // Generate QR code
+    let qrContainer = document.getElementById('qrCodeContainer');
+    if (!qrContainer) {
+        qrContainer = document.createElement('div');
+        qrContainer.id = 'qrCodeContainer';
+        qrContainer.style.cssText = 'display:none;text-align:center;margin:20px 0;';
+        qrContainer.innerHTML = '<h4 style="margin:10px 0;">Scan to Import Configuration</h4><canvas id="qrCodeCanvas"></canvas>';
+        document.querySelector('.results')?.appendChild(qrContainer);
+    }
+    
+    // Show for print
+    qrContainer.style.display = 'block';
+    
+    try {
+        await QRCode.toCanvas(document.getElementById('qrCodeCanvas'), dataUrl, {
+            width: 200,
+            margin: 2,
+            color: { dark: '#000000', light: '#ffffff' }
+        });
+    } catch (err) {
+        console.error('QR generation failed:', err);
+    }
+    
     const results = document.querySelector('.results');
     if (results) results.setAttribute('data-date', new Date().toLocaleString());
+    
     window.print();
+    
+    // Hide QR after print
+    setTimeout(() => {
+        qrContainer.style.display = 'none';
+    }, 500);
 }
 
 let resizeTimer;

@@ -7,6 +7,27 @@
     --danger: #f43f5e;
     --success: #10b981;
     --text-muted: #94a3b8;
+    --text-primary: #e2e8f0;
+    --text-secondary: #cbd5e1;
+    --header-bg: #000;
+    --input-bg: #1e293b;
+    --shadow: rgba(0,0,0,0.5);
+}
+
+[data-theme="light"] {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --accent: #0891b2;
+    --border: #cbd5e1;
+    --warning: #d97706;
+    --danger: #dc2626;
+    --success: #059669;
+    --text-muted: #64748b;
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --header-bg: #ffffff;
+    --input-bg: #f1f5f9;
+    --shadow: rgba(0,0,0,0.1);
 }
 
 * {
@@ -19,7 +40,7 @@
 
 body {
     background: var(--bg);
-    color: #e2e8f0;
+    color: var(--text-primary);
     font-family: 'Inter', sans-serif;
     font-size: 15px;
     margin: 0;
@@ -28,12 +49,81 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Theme Toggle */
+.theme-toggle {
+    background: var(--input-bg);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 1.4rem;
+    transition: all 0.3s;
+    margin-right: 10px;
+    line-height: 1;
+}
+.theme-toggle:hover {
+    border-color: var(--accent);
+    transform: scale(1.1);
+}
+
+/* Print Styles - Proper Chart Sizing */
+@media print {
+    @page {
+        size: A4;
+        margin: 15mm;
+    }
+    
+    body {
+        overflow: visible !important;
+        height: auto !important;
+        background: white !important;
+        color: black !important;
+    }
+    
+    /* Hide navigation elements */
+    header, .sidebar, .no-print, .theme-toggle {
+        display: none !important;
+    }
+    
+    /* Chart container sizing */
+    .chart-container {
+        max-width: 100% !important;
+        width: 100% !important;
+        height: 450px !important;
+        page-break-inside: avoid;
+        page-break-after: avoid;
+    }
+    
+    #mainChart {
+        max-width: 100% !important;
+        width: 100% !important;
+        height: 450px !important;
+    }
+    
+    /* Results section */
+    .results-panel {
+        page-break-before: avoid;
+        page-break-inside: avoid;
+    }
+    
+    /* Data table */
+    .data-table-section {
+        page-break-before: always;
+    }
+    
+    /* QR Code section */
+    .qr-section {
+        page-break-before: avoid;
+        margin-top: 20px;
+    }
+}
+
 /* Header */
 header {
     padding: 15px 25px;
     border-bottom: 3px solid var(--accent);
-    background: #000;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    background: var(--header-bg);
+    box-shadow: 0 4px 10px var(--shadow);
 }
 
 .header-content {

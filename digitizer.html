@@ -112,7 +112,10 @@ header{background:#000;border-bottom:2px solid var(--acc);display:flex;
 <header>
   <div><div class="htitle">📐 Curve Digitizer</div>
   <div class="hsub">Trace datasheet → physics data in 30 seconds</div></div>
-  <button class="btn-hdr" onclick="window.location.href='index.html'">← Back to Simulator</button>
+  <div>
+    <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">☀️</button>
+    <button class="btn-hdr" onclick="window.location.href='index.html'">← Back to Simulator</button>
+  </div>
 </header>
 <div class="main">
 <aside class="sidebar">
@@ -1029,5 +1032,6 @@ function showToast(msg){
 // Wire step-4 → step-5 button
 document.querySelector('#s4 .a-go').onclick=()=>{buildTable();};
 </script>
+<script src="theme.js"></script>
 </body>
 </html>
