@@ -162,14 +162,89 @@ function init() {
     document.getElementById('modeSS')?.addEventListener('click', () => setMode('SS'));
     document.getElementById('motorJ')?.addEventListener('input', updateCombinedJ);
     document.getElementById('loadJ')?.addEventListener('input', updateCombinedJ);
+    document.getElementById('importStartFile')?.addEventListener('change', handleStartFileImport);
 
     loadCaseList();
     updateHeader();
     updateCombinedJ();
     
+    // Check for config import from URL (QR scan or .start file)
+    checkForConfigImport();
+    
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('sw.js').catch(() => {});
     }
+}
+
+function checkForConfigImport() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const configParam = urlParams.get('config');
+    
+    if (configParam) {
+        try {
+            const motorData = JSON.parse(atob(decodeURIComponent(configParam)));
+            importMotorConfig(motorData);
+            // Clear URL parameter after import
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) {
+            console.error('Failed to import config from URL:', e);
+        }
+    }
+}
+
+function importMotorConfig(data) {
+    // Import motor parameters
+    if (data.kw) document.getElementById('mKW').value = data.kw;
+    if (data.flc) document.getElementById('mFLC').value = data.flc;
+    if (data.rpm) document.getElementById('mRPM').value = data.rpm;
+    if (data.poles) document.getElementById('mPoles').value = data.poles;
+    if (data.freq) document.getElementById('mFreq').value = data.freq;
+    if (data.stall) document.getElementById('hStall').value = data.stall;
+    if (data.serviceFactor) document.getElementById('serviceFactor').value = data.serviceFactor;
+    if (data.systemVoltage) document.getElementById('systemVoltage').value = data.systemVoltage;
+    if (data.motorJ) document.getElementById('motorJ').value = data.motorJ;
+    if (data.loadJ) document.getElementById('loadJ').value = data.loadJ;
+    
+    // Import curves if provided
+    if (data.mt) {
+        const mtValues = data.mt.split(',');
+        const mts = document.querySelectorAll('.val-mt');
+        mtValues.forEach((v, i) => { if (mts[i]) mts[i].value = v; });
+    }
+    if (data.mc) {
+        const mcValues = data.mc.split(',');
+        const mcs = document.querySelectorAll('.val-mc');
+        mcValues.forEach((v, i) => { if (mcs[i]) mcs[i].value = v; });
+    }
+    if (data.lt) {
+        const ltValues = data.lt.split(',');
+        const lts = document.querySelectorAll('.val-lt');
+        ltValues.forEach((v, i) => { if (lts[i]) lts[i].value = v; });
+    }
+    
+    updateHeader();
+    updateCombinedJ();
+    window.splineCache = {};
+    
+    alert('✅ Configuration imported successfully!\n\nMotor: ' + (data.kw || 'Unknown') + ' kW\nFrom: QR code or .start file');
+}
+
+function handleStartFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const motorData = JSON.parse(e.target.result);
+            importMotorConfig(motorData);
+            // Clear file input
+            event.target.value = '';
+        } catch (err) {
+            alert('❌ Error importing file:\n\n' + err.message + '\n\nPlease ensure the file is a valid .start file.');
+        }
+    };
+    reader.readAsText(file);
 }
 
 function onStartTimeEdit() {
@@ -846,7 +921,7 @@ function showImportBanner(count) {
 }
 
 async function exportToPDF() {
-    // Generate motor config data URL for QR code
+    // Generate motor config data
     const motorData = {
         kw: document.getElementById('mKW').value,
         flc: document.getElementById('mFLC').value,
@@ -857,19 +932,27 @@ async function exportToPDF() {
         serviceFactor: document.getElementById('serviceFactor')?.value || 1.0,
         systemVoltage: document.getElementById('systemVoltage')?.value || 100,
         motorJ: document.getElementById('motorJ').value,
-        loadJ: document.getElementById('loadJ').value
+        loadJ: document.getElementById('loadJ').value,
+        mt: [...document.querySelectorAll('.val-mt')].map(e => e.value).join(','),
+        mc: [...document.querySelectorAll('.val-mc')].map(e => e.value).join(','),
+        lt: [...document.querySelectorAll('.val-lt')].map(e => e.value).join(',')
     };
     
-    // Create data URL - app can parse this to import motor config
-    const dataUrl = `motorstarter://import?` + new URLSearchParams(motorData).toString();
+    // Create web app URL with data
+    const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, 'index.html');
+    const dataUrl = baseUrl + '?config=' + encodeURIComponent(btoa(JSON.stringify(motorData)));
     
     // Generate QR code
     let qrContainer = document.getElementById('qrCodeContainer');
     if (!qrContainer) {
         qrContainer = document.createElement('div');
         qrContainer.id = 'qrCodeContainer';
-        qrContainer.style.cssText = 'display:none;text-align:center;margin:20px 0;';
-        qrContainer.innerHTML = '<h4 style="margin:10px 0;">Scan to Import Configuration</h4><canvas id="qrCodeCanvas"></canvas>';
+        qrContainer.style.cssText = 'text-align:center;margin:30px 0;padding:20px;border:2px solid #cbd5e1;border-radius:8px;page-break-inside:avoid;';
+        qrContainer.innerHTML = `
+            <h4 style="margin:10px 0 15px;font-size:1rem;color:#0f172a;">Scan to Import Configuration</h4>
+            <canvas id="qrCodeCanvas" style="border:1px solid #e2e8f0;padding:10px;background:white;"></canvas>
+            <p style="margin-top:15px;font-size:0.85rem;color:#64748b;">Or <a href="#" id="downloadStart" style="color:#0891b2;font-weight:600;">download .start file</a></p>
+        `;
         document.querySelector('.results')?.appendChild(qrContainer);
     }
     
@@ -877,24 +960,61 @@ async function exportToPDF() {
     qrContainer.style.display = 'block';
     
     try {
-        await QRCode.toCanvas(document.getElementById('qrCodeCanvas'), dataUrl, {
-            width: 200,
-            margin: 2,
-            color: { dark: '#000000', light: '#ffffff' }
-        });
+        // Check if QRCode is available
+        if (typeof QRCode === 'undefined') {
+            console.error('QRCode library not loaded');
+            qrContainer.querySelector('h4').textContent = 'QR Code generation unavailable';
+        } else {
+            await QRCode.toCanvas(document.getElementById('qrCodeCanvas'), dataUrl, {
+                width: 180,
+                margin: 2,
+                color: { dark: '#000000', light: '#ffffff' }
+            });
+        }
     } catch (err) {
         console.error('QR generation failed:', err);
+        qrContainer.querySelector('h4').textContent = 'QR Code generation failed';
+    }
+    
+    // Add .start file download handler
+    const downloadLink = document.getElementById('downloadStart');
+    if (downloadLink) {
+        downloadLink.onclick = (e) => {
+            e.preventDefault();
+            downloadStartFile(motorData);
+        };
     }
     
     const results = document.querySelector('.results');
     if (results) results.setAttribute('data-date', new Date().toLocaleString());
     
-    window.print();
-    
-    // Hide QR after print
+    // Small delay to ensure QR renders before print dialog
     setTimeout(() => {
-        qrContainer.style.display = 'none';
-    }, 500);
+        window.print();
+        
+        // Hide QR after print (but keep for screen viewing)
+        setTimeout(() => {
+            qrContainer.style.display = 'none';
+        }, 500);
+    }, 100);
+}
+
+function downloadStartFile(motorData) {
+    // Create .start file content
+    const content = JSON.stringify(motorData, null, 2);
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `motor_${motorData.kw}kW_${Date.now()}.start`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert('📥 Download started!\n\nShare this .start file with others.\nThey can upload it via "Import Config" to load this motor configuration.');
 }
 
 let resizeTimer;
