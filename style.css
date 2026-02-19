@@ -12,12 +12,10 @@
     --header-bg: #000;
     --input-bg: #1e293b;
     --shadow: rgba(0,0,0,0.5);
-    --result-bg: #0f172a;
-    --code-bg: #0a0c10;
 }
 
 [data-theme="light"] {
-    --bg: #f1f5f9;
+    --bg: #f8fafc;
     --card: #ffffff;
     --accent: #0891b2;
     --border: #cbd5e1;
@@ -28,33 +26,8 @@
     --text-primary: #0f172a;
     --text-secondary: #334155;
     --header-bg: #ffffff;
-    --input-bg: #f8fafc;
+    --input-bg: #f1f5f9;
     --shadow: rgba(0,0,0,0.1);
-    --result-bg: #f8fafc;
-    --code-bg: #f8fafc;
-}
-
-/* Hide icons in light mode (professional appearance) */
-[data-theme="light"] .icon {
-    display: none !important;
-}
-[data-theme="light"] h3 {
-    font-weight: 700;
-    letter-spacing: 0.5px;
-}
-
-/* Ensure all text inputs are visible in both modes */
-input, select, textarea {
-    background: var(--input-bg);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    padding: 8px;
-    border-radius: 6px;
-    font-family: 'Inter', sans-serif;
-}
-input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: var(--accent);
 }
 
 * {
@@ -93,28 +66,11 @@ body {
     transform: scale(1.1);
 }
 
-/* Print Styles - Always Professional Light Mode */
+/* Print Styles - Proper Chart Sizing */
 @media print {
     @page {
         size: A4;
         margin: 15mm;
-    }
-    
-    /* Hide ALL icons in print */
-    .icon {
-        display: none !important;
-    }
-    
-    /* Force light mode colors for professional appearance */
-    * {
-        --bg: #ffffff !important;
-        --card: #ffffff !important;
-        --text-primary: #0f172a !important;
-        --text-secondary: #334155 !important;
-        --text-muted: #64748b !important;
-        --border: #cbd5e1 !important;
-        --result-bg: #f8fafc !important;
-        --code-bg: #f8fafc !important;
     }
     
     body {
@@ -127,28 +83,6 @@ body {
     /* Hide navigation elements */
     header, .sidebar, .no-print, .theme-toggle {
         display: none !important;
-    }
-    
-    /* Force all text to be dark */
-    h1, h2, h3, h4, h5, h6, p, span, div, label, td, th, input {
-        color: black !important;
-    }
-    
-    /* Result boxes - light background */
-    .result-item {
-        background: #f8fafc !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-    
-    .result-value {
-        color: black !important;
-    }
-    
-    /* Cards - white background */
-    .card {
-        background: white !important;
-        border: 1px solid #cbd5e1 !important;
-        box-shadow: none !important;
     }
     
     /* Chart container sizing */
@@ -177,28 +111,10 @@ body {
         page-break-before: always;
     }
     
-    /* QR Code section - MUST be visible in print */
-    #qrCodeContainer, .qr-section {
-        display: block !important;
+    /* QR Code section */
+    .qr-section {
         page-break-before: avoid;
-        margin-top: 30px;
-        padding: 20px;
-        border: 2px solid #cbd5e1;
-        border-radius: 8px;
-        text-align: center;
-        background: white;
-    }
-    
-    #qrCodeContainer h4 {
-        color: black !important;
-        margin-bottom: 15px;
-        font-size: 0.9rem;
-    }
-    
-    #qrCodeCanvas {
-        border: 1px solid #e2e8f0;
-        padding: 10px;
-        background: white;
+        margin-top: 20px;
     }
 }
 
@@ -475,25 +391,6 @@ input:focus, .input-select:focus {
     color: var(--accent);
 }
 
-.btn-import {
-    width: 100%;
-    background: var(--card);
-    border: 2px dashed var(--border);
-    color: var(--text-primary);
-    padding: 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    transition: all 0.2s;
-}
-
-.btn-import:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-    background: rgba(34, 211, 238, 0.05);
-}
-
 .btn-toggle {
     background: var(--accent);
     color: #000;
@@ -599,7 +496,7 @@ input:focus, .input-select:focus {
 }
 
 .result-item {
-    background: var(--result-bg);
+    background: #0a0e1a;
     padding: 14px;
     border-radius: 6px;
     border: 1px solid var(--border);
@@ -617,7 +514,7 @@ input:focus, .input-select:focus {
 .result-value {
     display: block;
     font-size: 0.95rem;
-    color: var(--text-primary);
+    color: #fff;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     padding: 4px;

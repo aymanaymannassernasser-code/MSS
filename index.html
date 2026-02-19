@@ -26,9 +26,9 @@
             </div>
             <div class="header-right">
                 <button id="themeToggle" class="theme-toggle no-print" onclick="toggleTheme()" title="Toggle Theme">☀️</button>
-                <a href="documentation.html" class="btn-notes no-print" target="_blank"><span class="icon">❓</span> How This Works</a>
-                <a href="digitizer.html" class="btn-digitize no-print"><span class="icon">📐</span> Digitize Curves</a>
-                <button id="btnExportPDF" class="btn-pdf no-print"><span class="icon">💾</span> Save to PDF</button>
+                <a href="documentation.html" class="btn-notes no-print" target="_blank">❓ How This Works</a>
+                <a href="digitizer.html" class="btn-digitize no-print">📐 Digitize Curves</a>
+                <button id="btnExportPDF" class="btn-pdf no-print">💾 Save to PDF</button>
             </div>
         </div>
     </header>
@@ -36,7 +36,7 @@
     <main class="dashboard">
         <aside class="sidebar">
             <section class="card case-manager">
-                <h3><span class="icon">💼</span> Case Management</h3>
+                <h3>💼 Case Management</h3>
                 <div class="f-group">
                     <label>Case Name</label>
                     <input type="text" id="caseName" placeholder="e.g., 450kW Pump">
@@ -49,16 +49,10 @@
                     <label>Load Saved Case</label>
                     <select id="caseDropdown" class="input-select"></select>
                 </div>
-                <div class="mt-10">
-                    <input type="file" id="importStartFile" accept=".start,.json" style="display:none;">
-                    <button class="btn-import" onclick="document.getElementById('importStartFile').click()">
-                        <span class="icon">📥</span> Import .start File
-                    </button>
-                </div>
             </section>
 
             <section class="card">
-                <h3><span class="icon">⚙️</span> Motor Configuration</h3>
+                <h3>⚙️ Motor Configuration</h3>
                 <div class="grid-2">
                     <div class="f-group"><label>Power (kW)</label><input type="number" id="mKW" value="450"></div>
                     <div class="f-group"><label>FLC (A)</label><input type="number" id="mFLC" value="48"></div>
@@ -93,10 +87,10 @@
             </section>
 
             <section class="card">
-                <h3><span class="icon">🎚️</span> Starting Method</h3>
+                <h3>🎚️ Starting Method</h3>
                 <div class="mode-selector">
-                    <button id="modeDOL" class="mode-btn active"><span class="icon">⚡</span> DOL Start</button>
-                    <button id="modeSS" class="mode-btn"><span class="icon">🎚️</span> Soft Start</button>
+                    <button id="modeDOL" class="mode-btn active">⚡ DOL Start</button>
+                    <button id="modeSS" class="mode-btn">🎚️ Soft Start</button>
                 </div>
 
                 <div id="ssControls" style="display: none;" class="mt-15">
@@ -161,7 +155,7 @@
 
         <article class="results">
             <section class="card">
-                <h3><span class="icon">📈</span> Results</h3>
+                <h3>📈 Results</h3>
                 <div class="results-grid">
                     <div class="result-item">
                         <span class="result-label">Start Time</span>
@@ -191,7 +185,7 @@
             </section>
 
             <section class="card">
-                <h3><span class="icon">📊</span> Torque-Current-Speed Characteristics
+                <h3>📊 Torque-Current-Speed Characteristics
                     <button id="btnSwapAxes" onclick="swapChartAxes()" title="Swap which Y-axis Torque and Current use" style="margin-left:12px;padding:4px 12px;background:rgba(251,191,36,.12);border:1px solid #fbbf24;color:#fbbf24;border-radius:5px;font-size:0.75rem;font-weight:700;cursor:pointer;vertical-align:middle;font-family:inherit;">⇄ Swap T/I Axes</button>
                 </h3>
                 <div class="chart-container">
