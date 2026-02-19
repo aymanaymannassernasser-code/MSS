@@ -921,7 +921,7 @@ function showImportBanner(count) {
 }
 
 async function exportToPDF() {
-    // Generate motor config data
+    // Generate motor config data including curves
     const motorData = {
         kw: document.getElementById('mKW').value,
         flc: document.getElementById('mFLC').value,
@@ -938,20 +938,28 @@ async function exportToPDF() {
         lt: [...document.querySelectorAll('.val-lt')].map(e => e.value).join(',')
     };
     
-    // Create web app URL with data
+    // Create web URL with data
     const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, 'index.html');
     const dataUrl = baseUrl + '?config=' + encodeURIComponent(btoa(JSON.stringify(motorData)));
     
-    // Generate QR code
+    // Generate QR code container
     let qrContainer = document.getElementById('qrCodeContainer');
     if (!qrContainer) {
         qrContainer = document.createElement('div');
         qrContainer.id = 'qrCodeContainer';
-        qrContainer.style.cssText = 'text-align:center;margin:30px 0;padding:20px;border:2px solid #cbd5e1;border-radius:8px;page-break-inside:avoid;';
+        qrContainer.className = 'qr-print-section';
         qrContainer.innerHTML = `
-            <h4 style="margin:10px 0 15px;font-size:1rem;color:#0f172a;">Scan to Import Configuration</h4>
-            <canvas id="qrCodeCanvas" style="border:1px solid #e2e8f0;padding:10px;background:white;"></canvas>
-            <p style="margin-top:15px;font-size:0.85rem;color:#64748b;">Or <a href="#" id="downloadStart" style="color:#0891b2;font-weight:600;">download .start file</a></p>
+            <div style="text-align:center;margin:30px 0;padding:20px;border:2px solid #cbd5e1;border-radius:8px;background:white;page-break-inside:avoid;">
+                <h4 style="margin:10px 0 15px;font-size:1rem;color:#0f172a;font-weight:700;">📱 Import This Configuration</h4>
+                <canvas id="qrCodeCanvas" style="border:1px solid #e2e8f0;padding:10px;background:white;display:inline-block;"></canvas>
+                <p style="margin-top:15px;font-size:0.85rem;color:#64748b;">Scan QR code to load this motor configuration</p>
+                <p style="margin-top:10px;">
+                    <button id="downloadStartBtn" style="background:#0891b2;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.9rem;">
+                        💾 Download .start File
+                    </button>
+                </p>
+                <p style="margin-top:8px;font-size:0.75rem;color:#94a3b8;">Share this file with colleagues or use for backup</p>
+            </div>
         `;
         document.querySelector('.results')?.appendChild(qrContainer);
     }
@@ -959,30 +967,60 @@ async function exportToPDF() {
     // Show for print
     qrContainer.style.display = 'block';
     
+    // Generate QR code with proper error handling
+    const canvas = document.getElementById('qrCodeCanvas');
     try {
-        // Check if QRCode is available
+        // Check if library loaded
         if (typeof QRCode === 'undefined') {
-            console.error('QRCode library not loaded');
-            qrContainer.querySelector('h4').textContent = 'QR Code generation unavailable';
-        } else {
-            await QRCode.toCanvas(document.getElementById('qrCodeCanvas'), dataUrl, {
-                width: 180,
-                margin: 2,
-                color: { dark: '#000000', light: '#ffffff' }
-            });
+            throw new Error('QRCode library not loaded');
         }
+        
+        // Wait a moment for library to be fully ready
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Generate QR code
+        await QRCode.toCanvas(canvas, dataUrl, {
+            width: 200,
+            margin: 2,
+            color: { 
+                dark: '#000000',
+                light: '#ffffff' 
+            },
+            errorCorrectionLevel: 'M'
+        });
+        
+        console.log('✅ QR code generated successfully');
+        
     } catch (err) {
-        console.error('QR generation failed:', err);
-        qrContainer.querySelector('h4').textContent = 'QR Code generation failed';
+        console.error('QR generation error:', err);
+        // Show error in canvas area
+        const ctx = canvas.getContext('2d');
+        canvas.width = 200;
+        canvas.height = 200;
+        ctx.fillStyle = '#fee';
+        ctx.fillRect(0, 0, 200, 200);
+        ctx.fillStyle = '#c00';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('QR Generation Failed', 100, 90);
+        ctx.fillText('Check console', 100, 110);
     }
     
-    // Add .start file download handler
-    const downloadLink = document.getElementById('downloadStart');
-    if (downloadLink) {
-        downloadLink.onclick = (e) => {
+    // Setup .start file download button
+    const downloadBtn = document.getElementById('downloadStartBtn');
+    if (downloadBtn) {
+        // Remove old listeners
+        downloadBtn.replaceWith(downloadBtn.cloneNode(true));
+        const newBtn = document.getElementById('downloadStartBtn');
+        
+        newBtn.onclick = (e) => {
             e.preventDefault();
+            e.stopPropagation();
             downloadStartFile(motorData);
+            return false;
         };
+        
+        console.log('✅ Download button configured');
     }
     
     const results = document.querySelector('.results');
@@ -992,29 +1030,45 @@ async function exportToPDF() {
     setTimeout(() => {
         window.print();
         
-        // Hide QR after print (but keep for screen viewing)
-        setTimeout(() => {
-            qrContainer.style.display = 'none';
-        }, 500);
-    }, 100);
+        // Keep QR visible after print for manual download
+        // Don't hide it automatically
+    }, 200);
 }
 
 function downloadStartFile(motorData) {
-    // Create .start file content
-    const content = JSON.stringify(motorData, null, 2);
-    const blob = new Blob([content], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    // Create download link
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `motor_${motorData.kw}kW_${Date.now()}.start`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    alert('📥 Download started!\n\nShare this .start file with others.\nThey can upload it via "Import Config" to load this motor configuration.');
+    try {
+        // Create .start file content
+        const content = JSON.stringify(motorData, null, 2);
+        const blob = new Blob([content], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        // Create download link
+        const a = document.createElement('a');
+        a.href = url;
+        const filename = `motor_${motorData.kw}kW_${Date.now()}.start`;
+        a.download = filename;
+        
+        // Trigger download
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        
+        alert('✅ Configuration Downloaded!\n\n' +
+              'File: ' + filename + '\n\n' +
+              'How to use:\n' +
+              '1. Share this file with colleagues\n' +
+              '2. Import via "Import .start File" button\n' +
+              '3. All motor data will restore automatically');
+        
+        console.log('✅ .start file downloaded:', filename);
+        
+    } catch (err) {
+        console.error('Download error:', err);
+        alert('❌ Download failed: ' + err.message);
+    }
 }
 
 let resizeTimer;

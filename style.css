@@ -97,7 +97,7 @@ body {
 @media print {
     @page {
         size: A4;
-        margin: 15mm;
+        margin: 12mm;
     }
     
     /* Hide ALL icons in print */
@@ -134,14 +134,31 @@ body {
         color: black !important;
     }
     
-    /* Result boxes - light background */
+    /* Results section - keep with chart */
+    .results {
+        page-break-inside: avoid;
+        page-break-after: avoid;
+    }
+    
+    /* Result boxes - compact for print */
     .result-item {
         background: #f8fafc !important;
         border: 1px solid #cbd5e1 !important;
+        padding: 10px !important;
     }
     
     .result-value {
         color: black !important;
+        font-size: 0.85rem !important;
+    }
+    
+    .result-label {
+        font-size: 0.65rem !important;
+    }
+    
+    /* Results grid - more compact */
+    .results-grid {
+        gap: 8px !important;
     }
     
     /* Cards - white background */
@@ -149,56 +166,58 @@ body {
         background: white !important;
         border: 1px solid #cbd5e1 !important;
         box-shadow: none !important;
+        padding: 15px !important;
+        margin-bottom: 10px !important;
     }
     
-    /* Chart container sizing */
+    .card h3 {
+        font-size: 0.9rem !important;
+        margin-bottom: 10px !important;
+    }
+    
+    /* Chart container - SMALLER for print to fit with results */
     .chart-container {
         max-width: 100% !important;
         width: 100% !important;
-        height: 450px !important;
+        height: 320px !important;
         page-break-inside: avoid;
         page-break-after: avoid;
+        margin-bottom: 10px !important;
     }
     
     #mainChart {
         max-width: 100% !important;
         width: 100% !important;
-        height: 450px !important;
+        height: 320px !important;
     }
     
-    /* Results section */
-    .results-panel {
-        page-break-before: avoid;
-        page-break-inside: avoid;
-    }
-    
-    /* Data table */
+    /* Data table section - new page */
     .data-table-section {
         page-break-before: always;
     }
     
-    /* QR Code section - MUST be visible in print */
-    #qrCodeContainer, .qr-section {
+    /* QR Code section - MUST be visible, can be on next page */
+    #qrCodeContainer, .qr-print-section {
         display: block !important;
-        page-break-before: avoid;
-        margin-top: 30px;
-        padding: 20px;
-        border: 2px solid #cbd5e1;
-        border-radius: 8px;
-        text-align: center;
-        background: white;
+        page-break-before: always;
+        margin-top: 0 !important;
     }
     
     #qrCodeContainer h4 {
         color: black !important;
         margin-bottom: 15px;
-        font-size: 0.9rem;
+        font-size: 0.95rem !important;
     }
     
     #qrCodeCanvas {
         border: 1px solid #e2e8f0;
         padding: 10px;
         background: white;
+    }
+    
+    /* Hide download button in print (only show QR) */
+    #downloadStartBtn {
+        display: none !important;
     }
 }
 
